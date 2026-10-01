@@ -40,6 +40,13 @@ export default function App() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+    if (pathname.endsWith('/admin') && window.location.hash === '#admin') {
+      window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
+    }
+  }, []);
+
+  useEffect(() => {
     if (!hasFirebaseConfig) return;
     let cancelled = false;
     import('./lib/firestoreCatalog').then(({ loadFirestoreCatalog }) => loadFirestoreCatalog())
