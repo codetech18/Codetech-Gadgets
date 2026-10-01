@@ -30,12 +30,14 @@ export default function ProductDetail({ product, onBack, onSwap, onAddToCart }: 
           <div className="product-detail-image">
             {product.image ? <img src={product.image} alt={product.name} /> : <div className="device-image-placeholder">CodeTech Gadgets</div>}
             {product.badge && <span className="device-badge">{product.badge}</span>}
+            <span className={`device-condition-badge ${product.listingGroup === 'goodies' ? 'goodies' : /brand\s*new/i.test(product.condition || '') ? 'brand-new' : ''}`}>{product.listingGroup === 'goodies' ? 'Goodies' : /brand\s*new/i.test(product.condition || '') ? 'Brand New' : 'UK Used'}</span>
+            {product.backInStock && <span className="device-restock-badge">Back in stock</span>}
           </div>
           <section className="product-detail-copy" aria-labelledby="product-title">
             <p className="eyebrow">{product.brand} <span aria-hidden="true">·</span> {product.condition || 'Condition details available'}</p>
             <h1 id="product-title">{product.name}</h1>
             <p className="product-detail-price">{money(product.price)}</p>
-            <div className="product-availability"><span /> Available to enquire about</div>
+            <div className="product-availability"><span /> {product.backInStock ? 'Back in stock · Available now' : 'Available to enquire about'}</div>
 
             <div className="product-detail-rule" />
             <h2>Device details</h2>

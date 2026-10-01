@@ -88,6 +88,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .device-image-placeholder { width: 100%; height: 100%; min-height: 195px; display: grid; place-items: center; background: linear-gradient(145deg,#f1f3f7,#e5eaf2); color: #697897; font-family: Manrope,sans-serif; font-size: 11px; font-weight: 700; letter-spacing: .08em; }
 .device-card:hover .device-image { transform: scale(1.045); }
 .device-badge { position: absolute; top: 12px; left: 12px; z-index: 1; padding: 6px 8px; background: rgba(255,255,255,.92); color: #344563; font-size: 8px; letter-spacing: .06em; text-transform: uppercase; font-weight: 700; }
+.device-condition-badge { position: absolute; top: 12px; right: 12px; z-index: 1; padding: 6px 8px; background: #e9eef8; color: #304c8c; font-size: 8px; letter-spacing: .05em; text-transform: uppercase; font-weight: 750; }
+.device-condition-badge.goodies { background: #fbf0dd; color: #845d20; }
+.device-condition-badge.brand-new { background: #e4f2eb; color: #276447; }
+.device-restock-badge { position: absolute; bottom: 12px; left: 12px; z-index: 1; padding: 6px 8px; background: #176c4d; color: #fff; font-size: 8px; font-weight: 750; }
 .device-open { position: absolute; left: 10px; right: 10px; bottom: 10px; min-height: 35px; display: flex; align-items: center; justify-content: space-between; padding: 0 11px; background: rgba(255,255,255,.95); color: #243f87; font-size: 10px; font-weight: 700; opacity: 0; transform: translateY(5px); transition: opacity .2s, transform .2s; }
 .device-card:hover .device-open, .device-card:focus-visible .device-open { opacity: 1; transform: translateY(0); }
 .device-copy { padding: 13px 1px 0; }
@@ -231,6 +235,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .admin-sidebar-brand strong { color: #142650; font: 750 14px Manrope,sans-serif; }
 .admin-sidebar-brand small { color: #8994a6; font-size: 8px; font-weight: 700; letter-spacing: .12em; }
 .admin-sidebar-label { margin: 0 11px 10px; color: #9aa3b1; font-size: 8px; font-weight: 800; letter-spacing: .14em; }
+.admin-sidebar-nav { display: grid; gap: 2px; }
 .admin-side-link { width: 100%; min-height: 41px; display: flex; align-items: center; gap: 11px; border: 0; padding: 0 11px; background: transparent; color: #637087; font-size: 11px; text-align: left; cursor: pointer; }
 .admin-side-link > span { width: 17px; color: #8994a7; font-size: 15px; text-align: center; }
 .admin-side-link > b { margin-left: auto; color: #8e98a8; font-size: 9px; font-weight: 600; }
@@ -419,3 +424,146 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 }
 
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; } }
+
+/* Admin workspace refinements for tablet and phone layouts. */
+@media (max-width: 900px) {
+  .admin-workspace { grid-template-columns: 174px minmax(0,1fr); }
+  .admin-sidebar { padding-right: 10px; padding-left: 10px; }
+  .admin-content { padding: 24px 17px; }
+  .admin-topbar { padding: 0 17px; }
+  .admin-stat-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+
+@media (max-width: 680px) {
+  .admin-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    height: auto;
+    display: block;
+    overflow: hidden;
+    padding: 10px 12px 0;
+    border-right: 0;
+    border-bottom: 1px solid #e7eaf0;
+    box-shadow: 0 5px 14px #1b284008;
+  }
+  .admin-sidebar-brand { padding: 0 2px 9px; }
+  .admin-sidebar-brand img { width: 30px; height: 30px; }
+  .admin-sidebar-label,.admin-sidebar-bottom { display: none; }
+  .admin-sidebar-nav {
+    display: flex;
+    gap: 5px;
+    margin: 0 -12px;
+    overflow-x: auto;
+    padding: 0 12px 8px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-sidebar-nav::-webkit-scrollbar { display: none; }
+  .admin-side-link {
+    width: auto;
+    min-height: 37px;
+    display: inline-flex;
+    flex: 0 0 auto;
+    gap: 6px;
+    margin: 0;
+    padding: 0 10px;
+    border: 1px solid #edf0f5;
+    background: #fff;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+  .admin-side-link > span { width: auto; font-size: 13px; }
+  .admin-side-link > b { display: inline; margin-left: 2px; font-size: 9px; }
+  .admin-side-link.active { border-color: #dce5fa; background: #f0f3fb; }
+  .admin-topbar { height: 45px; gap: 8px; padding: 0 12px; font-size: 9px; }
+  .admin-topbar > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .admin-topbar i { padding: 0 4px; }
+  .admin-topbar > div { flex: 0 0 auto; gap: 9px; white-space: nowrap; }
+  .admin-secure-indicator { font-size: 8px; }
+  .admin-topbar button { padding: 8px 0 8px 4px; font-size: 9px; }
+  .admin-content { padding: 19px 12px 32px; }
+  .admin-page-heading { align-items: stretch; gap: 14px; margin-bottom: 15px; }
+  .admin-page-heading h1 { font-size: 23px; }
+  .admin-page-heading p:not(.admin-eyebrow) { font-size: 10px; line-height: 1.55; }
+  .admin-primary-button { min-height: 43px; width: 100%; font-size: 11px; }
+  .admin-stat-grid { gap: 8px; margin-bottom: 13px; }
+  .admin-stat-grid article { min-height: 91px; padding: 11px; }
+  .admin-stat-grid article > span { font-size: 9px; }
+  .admin-stat-grid article > strong { margin-top: 7px; font-size: 21px; }
+  .admin-stat-grid article > small { font-size: 8px; }
+  .admin-inventory-heading { align-items: flex-start; gap: 8px; padding: 14px 12px; }
+  .admin-inventory-heading h2 { font-size: 13px; }
+  .admin-inventory-heading p { max-width: 235px; font-size: 8px; line-height: 1.5; }
+  .admin-refresh-button { flex: 0 0 auto; padding: 8px; font-size: 9px; }
+  .admin-inventory-controls { gap: 6px; padding: 0 12px 10px; }
+  .admin-filter-tabs { width: calc(100% + 12px); height: 43px; gap: 18px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .admin-filter-tabs::-webkit-scrollbar { display: none; }
+  .admin-filter-tabs button { flex: 0 0 auto; font-size: 9px; white-space: nowrap; }
+  .admin-search { height: 38px; font-size: 11px; }
+  .admin-search input { font-size: 11px; }
+  .admin-inventory-error { padding: 11px 12px; line-height: 1.55; }
+  .admin-table-wrap { overflow: visible; padding: 9px; }
+  .admin-product-table,
+  .admin-product-table tbody { display: block; width: 100%; white-space: normal; }
+  .admin-product-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; clip-path: inset(50%); }
+  .admin-product-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2,minmax(0,1fr));
+    gap: 0 12px;
+    margin-bottom: 9px;
+    padding: 8px 11px;
+    border: 1px solid #e9edf3;
+    background: #fff;
+  }
+  .admin-product-table tbody tr:last-child { margin-bottom: 0; }
+  .admin-product-table td,
+  .admin-product-table td:first-child {
+    height: auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 5px;
+    padding: 9px 0;
+    border-top: 1px solid #f0f2f6;
+    font-size: 10px;
+    white-space: normal;
+  }
+  .admin-product-table td::before { color: #929bac; font-size: 8px; font-weight: 700; }
+  .admin-inventory-table td:nth-child(1), .admin-sales-table td:nth-child(1) {
+    grid-column: 1 / -1;
+    align-items: stretch;
+    padding: 4px 0 10px;
+    border-top: 0;
+  }
+  .admin-inventory-table td:nth-child(1)::before { content: 'PRODUCT'; margin-bottom: 2px; }
+  .admin-inventory-table td:nth-child(2)::before, .admin-sales-table td:nth-child(2)::before { content: 'SECTION'; }
+  .admin-inventory-table td:nth-child(3)::before { content: 'CONDITION'; }
+  .admin-inventory-table td:nth-child(4)::before { content: 'STOCK'; }
+  .admin-inventory-table td:nth-child(5)::before { content: 'PRICE'; }
+  .admin-sales-table td:nth-child(1)::before { content: 'ITEM SOLD'; margin-bottom: 2px; }
+  .admin-sales-table td:nth-child(3)::before { content: 'SOLD VIA'; }
+  .admin-sales-table td:nth-child(4)::before { content: 'QUANTITY'; }
+  .admin-sales-table td:nth-child(5)::before { content: 'FINAL PRICE'; }
+  .admin-sales-table td:nth-child(6)::before { content: 'SALE STATUS'; }
+  .admin-inventory-table td:nth-child(6), .admin-sales-table td:nth-child(7) {
+    grid-column: 1 / -1;
+    align-items: stretch;
+    padding-top: 9px;
+  }
+  .admin-inventory-table td:nth-child(6)::before, .admin-sales-table td:nth-child(7)::before { content: 'ACTIONS'; }
+  .admin-product-cell { gap: 9px; }
+  .admin-product-cell img,.admin-product-placeholder { width: 48px; height: 48px; }
+  .admin-product-cell strong { max-width: 100%; font-size: 10px; white-space: normal; }
+  .admin-product-cell small { font-size: 8px; overflow-wrap: anywhere; }
+  .admin-row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .admin-row-actions button,.admin-reverse-button { min-height: 38px; padding: 8px; font-size: 10px; }
+  .admin-action-done { font-size: 9px; }
+  .admin-modal-backdrop { align-items: end; padding: 0; }
+  .admin-modal { width: 100%; max-height: 92dvh; margin: 0; overflow-y: auto; border-radius: 18px 18px 0 0; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .admin-modal > div:first-child { padding: 17px 18px; }
+  .admin-modal > div:nth-child(2) { grid-template-columns: minmax(0,1fr); gap: 13px; padding: 16px 18px; }
+  .admin-modal > div:last-child { padding: 13px 18px; }
+}

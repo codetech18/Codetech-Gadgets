@@ -20,6 +20,7 @@ export interface Product {
   stock?: number;
   listingStatus?: 'available' | 'out_of_stock' | 'sold';
   serialNumber?: string;
+  backInStock?: boolean;
 }
 
 export interface SaleRecord {

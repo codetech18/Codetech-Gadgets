@@ -1,4 +1,4 @@
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
 import { Product } from '../types';
 import { getDatabase } from './firebase';
 
@@ -22,6 +22,7 @@ type CatalogRecord = {
   reviews?: number | string;
   oldPriceNgn?: number | string;
   status?: 'available' | 'out_of_stock' | 'sold';
+  backInStock?: boolean;
   createdAt?: { toMillis?: () => number };
 };
 
@@ -47,6 +48,7 @@ function toProduct(id: string, record: CatalogRecord, serialNumber?: string): Pr
       listingGroup: record.listingGroup === 'goodies' ? 'goodies' : 'devices',
       stock,
       listingStatus: record.status ?? (stock > 0 ? 'available' : 'out_of_stock'),
+      backInStock: Boolean(record.backInStock),
       ...(serialNumber !== undefined ? { serialNumber } : {}),
     };
     const oldPrice = Number(record.oldPriceNgn ?? 0);
@@ -54,14 +56,24 @@ function toProduct(id: string, record: CatalogRecord, serialNumber?: string): Pr
     return product;
 }
 
-export async function loadFirestoreCatalog(): Promise<Product[]> {
-  const availableListings = query(collection(getDatabase(), 'products'), where('status', '==', 'available'));
-  const snapshot = await getDocs(availableListings);
+function productsFromCatalogSnapshot(snapshot: { docs: Array<{ id: string; data: () => Record<string, unknown> }> }): Product[] {
   return snapshot.docs
     .map(document => ({ product: toProduct(document.id, document.data() as CatalogRecord), record: document.data() as CatalogRecord }))
     .filter((item): item is { product: Product; record: CatalogRecord } => item.product !== null && (item.product.stock ?? 0) > 0)
     .sort((a, b) => Number(Boolean(b.record.featured)) - Number(Boolean(a.record.featured)) || (b.record.createdAt?.toMillis?.() ?? 0) - (a.record.createdAt?.toMillis?.() ?? 0))
     .map(({ product }) => product);
+}
+
+function publicCatalogQuery() {
+  return query(collection(getDatabase(), 'products'), where('status', '==', 'available'));
+}
+
+export async function loadFirestoreCatalog(): Promise<Product[]> {
+  return productsFromCatalogSnapshot(await getDocs(publicCatalogQuery()));
+}
+
+export function subscribeFirestoreCatalog(onUpdate: (products: Product[]) => void, onError: (error: Error) => void) {
+  return onSnapshot(publicCatalogQuery(), snapshot => onUpdate(productsFromCatalogSnapshot(snapshot)), onError);
 }
 
 export async function loadFirestoreInventory(): Promise<Product[]> {

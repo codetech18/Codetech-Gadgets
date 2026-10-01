@@ -73,6 +73,7 @@ export async function markInventoryProductSold(id: string, soldPrice: number) {
     transaction.update(productRef, {
       stockQuantity: stockAfter,
       status: stockAfter > 0 ? 'available' : 'sold',
+      backInStock: false,
       lastSoldAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -96,7 +97,7 @@ export async function markInventoryProductSold(id: string, soldPrice: number) {
   return saleRef.id;
 }
 
-export async function reverseInventorySale(saleId: string, reason: string, restock: boolean) {
+export async function reverseInventorySale(saleId: string, reason: string) {
   const cleanReason = reason.trim();
   if (cleanReason.length < 5) throw new Error('Add a short reason for reversing this sale.');
 
@@ -114,24 +115,24 @@ export async function reverseInventorySale(saleId: string, reason: string, resto
     const productId = String(sale.productId ?? '');
     const productRef = productId ? doc(database, 'products', productId) : null;
     const productSnapshot = productRef ? await transaction.get(productRef) : null;
-    if (restock && (!productSnapshot || !productSnapshot.exists())) {
+    if (!productSnapshot || !productSnapshot.exists()) {
       throw new Error('The original inventory item could not be found to restock.');
     }
 
-    if (restock && productRef && productSnapshot?.exists()) {
-      const currentStock = Math.max(0, Number(productSnapshot.data().stockQuantity ?? 0));
-      transaction.update(productRef, {
-        stockQuantity: currentStock + 1,
-        status: 'available',
-        updatedAt: serverTimestamp(),
-      });
-    }
+    const currentStock = Math.max(0, Number(productSnapshot.data().stockQuantity ?? 0));
+    transaction.update(productRef!, {
+      stockQuantity: currentStock + 1,
+      status: 'available',
+      backInStock: true,
+      restockedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
 
     transaction.set(reversalRef, {
       saleId,
       productId,
       reason: cleanReason,
-      restocked: restock,
+      restocked: true,
       reversedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
     });

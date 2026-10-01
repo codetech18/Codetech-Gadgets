@@ -7,7 +7,7 @@ interface AdminProps {
   onAddProduct: (product: Omit<Product, 'id'>) => Promise<void>;
   onEditProduct: (id: Product['id'], product: Omit<Product, 'id'>) => Promise<void>;
   onMarkSold: (id: Product['id'], soldPrice: number) => Promise<void>;
-  onReverseSale: (saleId: string, reason: string, restock: boolean) => Promise<void>;
+  onReverseSale: (saleId: string, reason: string) => Promise<void>;
   onBack: () => void;
 }
 
@@ -61,7 +61,6 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
   const [saleBusy, setSaleBusy] = useState(false);
   const [reversingSale, setReversingSale] = useState<SaleRecord | null>(null);
   const [reversalReason, setReversalReason] = useState('');
-  const [restockReturned, setRestockReturned] = useState(true);
   const [reversalError, setReversalError] = useState('');
   const [reversalBusy, setReversalBusy] = useState(false);
 
@@ -275,7 +274,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
     setReversalBusy(true);
     setReversalError('');
     try {
-      await onReverseSale(reversingSale.id, reversalReason, restockReturned);
+      await onReverseSale(reversingSale.id, reversalReason);
       await refreshInventory();
       await refreshSales();
       setReversingSale(null);
@@ -289,7 +288,6 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
   function openReverseSale(sale: SaleRecord) {
     setReversingSale(sale);
     setReversalReason('');
-    setRestockReturned(true);
     setReversalError('');
   }
 
@@ -346,11 +344,13 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
         <aside className="admin-sidebar">
           <button className="admin-sidebar-brand" onClick={onBack}><img src="/codetech-mark.jpg" alt=""/><span><strong>CodeTech</strong><small>GADGETS ADMIN</small></span></button>
           <p className="admin-sidebar-label">STORE MANAGEMENT</p>
+          <nav className="admin-sidebar-nav" aria-label="Admin sections">
           <button className={`admin-side-link ${activeSection === 'inventory' && inventoryFilter === 'all' ? 'active' : ''}`} onClick={() => { setActiveSection('inventory'); setInventoryFilter('all'); }}><span>▦</span> Overview</button>
           <button className={`admin-side-link ${activeSection === 'inventory' && inventoryFilter === 'devices' ? 'active' : ''}`} onClick={() => { setActiveSection('inventory'); setInventoryFilter('devices'); }}><span>◫</span> Devices <b>{deviceCount}</b></button>
           <button className={`admin-side-link ${activeSection === 'inventory' && inventoryFilter === 'goodies' ? 'active' : ''}`} onClick={() => { setActiveSection('inventory'); setInventoryFilter('goodies'); }}><span>◈</span> Goodies <b>{goodiesCount}</b></button>
           <button className={`admin-side-link ${activeSection === 'inventory' && inventoryFilter === 'low-stock' ? 'active' : ''}`} onClick={() => { setActiveSection('inventory'); setInventoryFilter('low-stock'); }}><span>◷</span> Low stock <b>{lowStockCount}</b></button>
           <button className={`admin-side-link ${activeSection === 'sales' ? 'active' : ''}`} onClick={() => setActiveSection('sales')}><span>↗</span> Sales history <b>{sales.length}</b></button>
+          </nav>
           <div className="admin-sidebar-bottom"><button className="admin-side-link" onClick={onBack}><span>↗</span> View storefront</button><p>Signed in as<br/><strong>{admin.email}</strong></p></div>
         </aside>
 
@@ -372,7 +372,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
               <div className="admin-inventory-controls"><div className="admin-filter-tabs">{([['all', 'All'], ['devices', 'Devices'], ['goodies', 'Goodies'], ['low-stock', 'Low stock']] as const).map(([filter, label]) => <button key={filter} className={inventoryFilter === filter ? 'selected' : ''} onClick={() => setInventoryFilter(filter)}>{label}</button>)}</div><label className="admin-search"><span>⌕</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search products" aria-label="Search products"/></label></div>
               {inventoryError && <p role="alert" className="admin-inventory-error">{inventoryError}</p>}
               {inventoryLoading ? <p className="admin-inventory-empty">Loading inventory…</p> : visibleProducts.length ? (
-                <div className="admin-table-wrap"><table className="admin-product-table"><thead><tr><th>Product</th><th>Section</th><th>Condition</th><th>Stock</th><th>Price</th><th>Actions</th></tr></thead><tbody>
+                <div className="admin-table-wrap"><table className="admin-product-table admin-inventory-table"><thead><tr><th>Product</th><th>Section</th><th>Condition</th><th>Stock</th><th>Price</th><th>Actions</th></tr></thead><tbody>
                   {visibleProducts.map(product => <tr key={product.id}>
                     <td><div className="admin-product-cell">{product.image ? <img src={product.image} alt=""/> : <span className="admin-product-placeholder">CT</span>}<span><strong>{product.name}</strong><small>{product.brand} · {product.category}</small><small>IMEI / serial: {product.serialNumber || 'Not recorded'}</small></span></div></td>
                     <td><span className={`admin-section-pill ${product.listingGroup === 'goodies' ? 'goodies' : ''}`}>{product.listingGroup === 'goodies' ? 'Goodies' : 'Devices'}</span></td>
@@ -386,7 +386,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
             </section> : <section className="admin-inventory-panel">
               <div className="admin-inventory-heading"><div><h2>Recorded sales</h2><p>Sold inventory stays in Firestore and is listed here for reference.</p></div><button className="admin-refresh-button" onClick={() => void refreshSales()} disabled={salesLoading}>{salesLoading ? 'Refreshing…' : '↻ Refresh'}</button></div>
               {inventoryError && <p role="alert" className="admin-inventory-error">{inventoryError}</p>}
-              {salesLoading ? <p className="admin-inventory-empty">Loading sales…</p> : sales.length ? <div className="admin-table-wrap"><table className="admin-product-table"><thead><tr><th>Item sold</th><th>Section</th><th>Sold via</th><th>Quantity</th><th>Final price</th><th>Sale status</th><th>Action</th></tr></thead><tbody>
+              {salesLoading ? <p className="admin-inventory-empty">Loading sales…</p> : sales.length ? <div className="admin-table-wrap"><table className="admin-product-table admin-sales-table"><thead><tr><th>Item sold</th><th>Section</th><th>Sold via</th><th>Quantity</th><th>Final price</th><th>Sale status</th><th>Action</th></tr></thead><tbody>
                 {sales.map(sale => <tr key={sale.id}><td><div className="admin-product-cell">{sale.image ? <img src={sale.image} alt=""/> : <span className="admin-product-placeholder">CT</span>}<span><strong>{sale.productName}</strong><small>{sale.brand} · {sale.condition}</small><small>IMEI / serial: {sale.serialNumber || 'Not recorded'}</small></span></div></td><td><span className={`admin-section-pill ${sale.listingGroup === 'goodies' ? 'goodies' : ''}`}>{sale.listingGroup === 'goodies' ? 'Goodies' : 'Devices'}</span></td><td><span className="admin-sale-channel">WhatsApp</span></td><td>{sale.quantity}</td><td className="admin-price-cell">₦{sale.soldPrice.toLocaleString('en-NG')}</td><td><span className={`admin-sale-status ${sale.reversedAt ? 'reversed' : ''}`}>{sale.reversedAt ? 'Reversed' : 'Completed'}</span>{sale.reversedAt && <small className="admin-reversal-reason">{new Date(sale.reversedAt).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })}{sale.restocked ? ' · Restocked' : ' · Not restocked'}{sale.reversalReason ? ` · ${sale.reversalReason}` : ''}</small>}</td><td>{sale.reversedAt ? <span className="admin-action-done">Recorded</span> : <button className="admin-reverse-button" onClick={() => openReverseSale(sale)}>Reverse sale</button>}</td></tr>)}
               </tbody></table></div> : <div className="admin-inventory-empty"><strong>No sales recorded yet</strong><span>When a device sells on WhatsApp, mark it as sold from your inventory to keep a record here.</span></div>}
             </section>}
@@ -395,8 +395,8 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
       </div>
 
       {modalOpen && (
-        <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setModalOpen(false); }}>
-          <form onSubmit={saveProduct} className="my-6 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="admin-modal-backdrop fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget) setModalOpen(false); }}>
+          <form onSubmit={saveProduct} className="admin-modal my-6 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
               <div><h2 className="text-xl font-bold text-slate-900">{editId === null ? 'Add a device' : 'Edit device'}</h2><p className="mt-1 text-sm text-slate-500">This information appears in the public catalogue.</p></div>
               <button type="button" onClick={() => setModalOpen(false)} aria-label="Close" className="rounded-lg px-3 py-2 text-slate-500 hover:bg-slate-100">✕</button>
@@ -441,8 +441,8 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
       )}
 
       {saleProduct && (
-        <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !saleBusy) setSaleProduct(null); }}>
-          <form onSubmit={recordSale} className="my-6 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="admin-modal-backdrop fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !saleBusy) setSaleProduct(null); }}>
+          <form onSubmit={recordSale} className="admin-modal my-6 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="border-b border-slate-100 px-6 py-5"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-blue-700">WHATSAPP SALE</p><h2 className="mt-2 text-xl font-bold text-slate-900">Record this sale</h2><p className="mt-1 text-sm text-slate-500">{saleProduct.name} · {saleProduct.condition}</p></div>
             <div className="space-y-4 px-6 py-5">
               <label className="block text-sm font-semibold text-slate-700">Final amount received (₦)
@@ -460,13 +460,11 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
       )}
 
       {reversingSale && (
-        <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !reversalBusy) setReversingSale(null); }}>
-          <form onSubmit={recordSaleReversal} className="my-6 w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="admin-modal-backdrop fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !reversalBusy) setReversingSale(null); }}>
+          <form onSubmit={recordSaleReversal} className="admin-modal my-6 w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="border-b border-slate-100 px-6 py-5"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-amber-700">SALE CORRECTION</p><h2 className="mt-2 text-xl font-bold text-slate-900">Reverse this sale?</h2><p className="mt-1 text-sm text-slate-500">{reversingSale.productName} · ₦{reversingSale.soldPrice.toLocaleString('en-NG')}</p></div>
             <div className="space-y-4 px-6 py-5">
-              <p className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">The original sale will stay in your history. This adds a separate reversal record; nothing is deleted.</p>
-              <label className="flex cursor-pointer gap-3 rounded-xl border border-slate-200 p-3 text-xs leading-5 text-slate-700"><input type="radio" name="restock" checked={restockReturned} onChange={() => setRestockReturned(true)} className="mt-0.5"/><span><strong className="block text-slate-900">Returned and ready to sell</strong>Restore one unit to available stock and show it in the catalogue again.</span></label>
-              <label className="flex cursor-pointer gap-3 rounded-xl border border-slate-200 p-3 text-xs leading-5 text-slate-700"><input type="radio" name="restock" checked={!restockReturned} onChange={() => setRestockReturned(false)} className="mt-0.5"/><span><strong className="block text-slate-900">Not returned or needs inspection</strong>Record the reversal, but keep this unit out of available stock.</span></label>
+              <p className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">The original sale will stay in your history. This adds a separate reversal record and restores one unit to available stock so it can be resold. Nothing is deleted.</p>
               <label className="block text-xs font-semibold text-slate-700">Reason for reversal
                 <textarea className={`${INPUT_CLASS} mt-1.5 min-h-20 resize-y`} value={reversalReason} onChange={event => setReversalReason(event.target.value)} placeholder="For example: customer cancelled before collection" required minLength={5}/>
               </label>

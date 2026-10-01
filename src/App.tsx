@@ -49,10 +49,15 @@ export default function App() {
   useEffect(() => {
     if (!hasFirebaseConfig) return;
     let cancelled = false;
-    import('./lib/firestoreCatalog').then(({ loadFirestoreCatalog }) => loadFirestoreCatalog())
-      .then(items => { if (!cancelled) { setProducts(items); setCatalogStatus('live'); } })
-      .catch(() => { if (!cancelled) { setProducts([]); setCatalogStatus('error'); } });
-    return () => { cancelled = true; };
+    let unsubscribe: (() => void) | null = null;
+    import('./lib/firestoreCatalog').then(({ subscribeFirestoreCatalog }) => {
+      if (cancelled) return;
+      unsubscribe = subscribeFirestoreCatalog(
+        items => { setProducts(items); setCatalogStatus('live'); },
+        () => { setCatalogStatus('error'); },
+      );
+    }).catch(() => { if (!cancelled) { setProducts([]); setCatalogStatus('error'); } });
+    return () => { cancelled = true; unsubscribe?.(); };
   }, [hasFirebaseConfig]);
 
   useEffect(() => {
@@ -173,13 +178,13 @@ export default function App() {
     showToast('Sale recorded. Inventory updated.');
   }
 
-  async function reverseSale(saleId: string, reason: string, restock: boolean) {
+  async function reverseSale(saleId: string, reason: string) {
     const { reverseInventorySale } = await import('./lib/firestoreInventory');
-    await reverseInventorySale(saleId, reason, restock);
+    await reverseInventorySale(saleId, reason);
     const { loadFirestoreCatalog } = await import('./lib/firestoreCatalog');
     setProducts(await loadFirestoreCatalog());
     setCatalogStatus('live');
-    showToast(restock ? 'Sale reversed and item returned to available stock.' : 'Sale reversal recorded. Item remains off sale.');
+    showToast('Sale reversed. One unit is back in stock and available for resale.');
   }
 
   const cartCount = cart.reduce((s, x) => s + x.qty, 0);
