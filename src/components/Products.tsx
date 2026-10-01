@@ -60,7 +60,7 @@ export default function Products({ products, onAddToCart }: ProductsProps) {
             {/* Image */}
             <div className="relative bg-gradient-to-br from-blue-50 to-blue-100 h-[150px] sm:h-[180px] md:h-[200px] flex items-center justify-center text-5xl sm:text-6xl">
               {p.badge && (
-                <span className={`absolute top-3 left-3 ${badgeClass(p.badge)} text-white text-[10px] font-bold px-2 py-0.5 rounded-md tracking-wide`}>
+                <span className={`absolute top-3 left-3 ${badgeClass(p.badge)} text-white text-xs font-bold px-2 py-0.5 rounded-md tracking-wide`}>
                   {p.badge}
                 </span>
               )}
@@ -69,7 +69,7 @@ export default function Products({ products, onAddToCart }: ProductsProps) {
 
             {/* Info */}
             <div className="p-3 sm:p-4">
-              <div className="text-[10px] sm:text-xs uppercase tracking-widest text-blue-400 font-bold mb-1">{p.brand}</div>
+              <div className="text-xs sm:text-xs uppercase tracking-widest text-blue-400 font-bold mb-1">{p.brand}</div>
               <div className="font-['Fraunces'] font-bold text-blue-950 leading-snug mb-2 text-sm sm:text-base line-clamp-2">
                 {p.name}
               </div>

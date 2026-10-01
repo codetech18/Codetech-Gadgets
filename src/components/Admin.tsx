@@ -443,7 +443,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
       {saleProduct && (
         <div className="admin-modal-backdrop fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !saleBusy) setSaleProduct(null); }}>
           <form onSubmit={recordSale} className="admin-modal my-6 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-slate-100 px-6 py-5"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-blue-700">WHATSAPP SALE</p><h2 className="mt-2 text-xl font-bold text-slate-900">Record this sale</h2><p className="mt-1 text-sm text-slate-500">{saleProduct.name} · {saleProduct.condition}</p></div>
+            <div className="border-b border-slate-100 px-6 py-5"><p className="text-xs font-bold uppercase tracking-[.15em] text-blue-700">WHATSAPP SALE</p><h2 className="mt-2 text-xl font-bold text-slate-900">Record this sale</h2><p className="mt-1 text-sm text-slate-500">{saleProduct.name} · {saleProduct.condition}</p></div>
             <div className="space-y-4 px-6 py-5">
               <label className="block text-sm font-semibold text-slate-700">Final amount received (₦)
                 <input className={`${INPUT_CLASS} mt-1.5`} type="number" min="0" step="1" value={salePrice} onChange={event => setSalePrice(event.target.value)} required />
@@ -462,7 +462,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
       {reversingSale && (
         <div className="admin-modal-backdrop fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !reversalBusy) setReversingSale(null); }}>
           <form onSubmit={recordSaleReversal} className="admin-modal my-6 w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-slate-100 px-6 py-5"><p className="text-[10px] font-bold uppercase tracking-[.15em] text-amber-700">SALE CORRECTION</p><h2 className="mt-2 text-xl font-bold text-slate-900">Reverse this sale?</h2><p className="mt-1 text-sm text-slate-500">{reversingSale.productName} · ₦{reversingSale.soldPrice.toLocaleString('en-NG')}</p></div>
+            <div className="border-b border-slate-100 px-6 py-5"><p className="text-xs font-bold uppercase tracking-[.15em] text-amber-700">SALE CORRECTION</p><h2 className="mt-2 text-xl font-bold text-slate-900">Reverse this sale?</h2><p className="mt-1 text-sm text-slate-500">{reversingSale.productName} · ₦{reversingSale.soldPrice.toLocaleString('en-NG')}</p></div>
             <div className="space-y-4 px-6 py-5">
               <p className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">The original sale will stay in your history. This adds a separate reversal record and restores one unit to available stock so it can be resold. Nothing is deleted.</p>
               <label className="block text-xs font-semibold text-slate-700">Reason for reversal
