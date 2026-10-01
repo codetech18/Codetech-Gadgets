@@ -1,0 +1,40 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isStoreAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'codetech1807@gmail.com'
+        && request.auth.token.email_verified == true;
+    }
+
+    match /products/{productId} {
+      // The storefront queries only available products; the signed-in admin can see inventory statuses too.
+      allow get, list: if resource.data.status == 'available' || isStoreAdmin();
+
+      // Only the verified store admin account can create or update inventory.
+      // Product records are retained; sales are recorded separately.
+      allow create, update: if isStoreAdmin()
+        && !request.resource.data.keys().hasAny(['serialNumber', 'imei']);
+    }
+
+    match /privateProductDetails/{productId} {
+      // IMEI and serial numbers are private operational data; never client-readable.
+      allow get, list, create, update: if isStoreAdmin();
+    }
+
+    match /sales/{saleId} {
+      // Sale history is private to the verified store admin and is append-only.
+      allow get, list, create: if isStoreAdmin();
+    }
+
+    match /saleReversals/{saleId} {
+      // Reversals are separate audit records; original sales cannot be altered or deleted.
+      allow get, list, create: if isStoreAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
