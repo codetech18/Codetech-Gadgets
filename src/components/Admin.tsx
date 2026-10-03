@@ -6,7 +6,7 @@ import { getFirebaseAuth } from '../lib/firebase';
 interface AdminProps {
   onAddProduct: (product: Omit<Product, 'id'>) => Promise<void>;
   onEditProduct: (id: Product['id'], product: Omit<Product, 'id'>) => Promise<void>;
-  onMarkSold: (id: Product['id'], soldPrice: number) => Promise<void>;
+  onMarkSold: (id: Product['id'], soldPrice: number, serialNumber: string | null) => Promise<void>;
   onReverseSale: (saleId: string, reason: string) => Promise<void>;
   onBack: () => void;
 }
@@ -14,7 +14,6 @@ interface AdminProps {
 type ProductForm = {
   name: string;
   brand: string;
-  serialNumber: string;
   price: string;
   oldPrice: string;
   category: string;
@@ -22,14 +21,15 @@ type ProductForm = {
   conditionNotes: string;
   stock: string;
   badge: string;
-  imageUrl: string;
+  images: string[];
+  imageUrlDraft: string;
   listingGroup: 'devices' | 'goodies';
 };
 
 type InventoryFilter = 'all' | 'devices' | 'goodies' | 'low-stock';
 
 const EMPTY_FORM: ProductForm = {
-  name: '', brand: '', serialNumber: '', price: '', oldPrice: '', category: '', condition: '', conditionNotes: '', stock: '1', badge: '', imageUrl: '', listingGroup: 'devices',
+  name: '', brand: '', price: '', oldPrice: '', category: '', condition: '', conditionNotes: '', stock: '1', badge: '', images: [], imageUrlDraft: '', listingGroup: 'devices',
 };
 const ADMIN_EMAIL = (import.meta.env.VITE_FIREBASE_ADMIN_EMAIL || '').trim().toLowerCase();
 const INPUT_CLASS = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
@@ -57,6 +57,8 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
   const [search, setSearch] = useState('');
   const [saleProduct, setSaleProduct] = useState<Product | null>(null);
   const [salePrice, setSalePrice] = useState('');
+  const [saleSerialNumber, setSaleSerialNumber] = useState('');
+  const [saleHasNoIdentifier, setSaleHasNoIdentifier] = useState(false);
   const [saleError, setSaleError] = useState('');
   const [saleBusy, setSaleBusy] = useState(false);
   const [reversingSale, setReversingSale] = useState<SaleRecord | null>(null);
@@ -167,7 +169,6 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
     setForm({
       name: product.name,
       brand: product.brand,
-      serialNumber: product.serialNumber || '',
       price: String(product.price),
       oldPrice: product.oldPrice ? String(product.oldPrice) : '',
       category: product.category,
@@ -175,25 +176,55 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
       conditionNotes: product.conditionNotes || '',
       stock: String(product.stock ?? 0),
       badge: product.badge || '',
-      imageUrl: product.image || '',
+      images: product.images?.length ? [...product.images] : product.image ? [product.image] : [],
+      imageUrlDraft: '',
       listingGroup: product.listingGroup || 'devices',
     });
     setFormError('');
     setModalOpen(true);
   }
 
-  async function uploadImage(file?: File) {
-    if (!file) return;
+  async function uploadImages(fileList?: FileList | null) {
+    const files = Array.from(fileList ?? []);
+    if (!files.length) return;
+    const slots = 3 - form.images.length;
+    if (files.length > slots) {
+      setFormError(`You can add up to three photos. There ${slots === 1 ? 'is' : 'are'} ${slots} photo slot${slots === 1 ? '' : 's'} left.`);
+      return;
+    }
     setUploadBusy(true);
     setFormError('');
     try {
       const { uploadProductImage } = await import('../lib/cloudinaryUpload');
-      const imageUrl = await uploadProductImage(file);
-      setForm(current => ({ ...current, imageUrl }));
+      for (const file of files) {
+        const imageUrl = await uploadProductImage(file);
+        setForm(current => ({ ...current, images: [...current.images, imageUrl] }));
+      }
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Image upload failed.');
+      setFormError(error instanceof Error ? error.message : 'One of the image uploads failed. Photos uploaded so far have been kept.');
     } finally {
       setUploadBusy(false);
+    }
+  }
+
+  function removeImage(index: number) {
+    setForm(current => ({ ...current, images: current.images.filter((_, imageIndex) => imageIndex !== index) }));
+  }
+
+  function addImageUrl() {
+    const value = form.imageUrlDraft.trim();
+    if (!value) return;
+    if (form.images.length >= 3) {
+      setFormError('You can add up to three product photos.');
+      return;
+    }
+    try {
+      const url = new URL(value);
+      if (!['https:', 'http:'].includes(url.protocol)) throw new Error('Use a valid image URL.');
+      setForm(current => ({ ...current, images: [...current.images, value], imageUrlDraft: '' }));
+      setFormError('');
+    } catch {
+      setFormError('Enter a valid hosted image URL.');
     }
   }
 
@@ -201,21 +232,21 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
     event.preventDefault();
     const price = Number(form.price);
     const stock = Number(form.stock);
-    if (!form.name.trim() || !form.brand.trim() || !form.serialNumber.trim() || !form.category || !form.condition || (form.listingGroup === 'goodies' && !form.conditionNotes.trim()) || !form.imageUrl || !Number.isFinite(price) || price <= 0 || !Number.isInteger(stock) || stock < 0) {
-      setFormError('Add a name, brand, IMEI or serial number, category, condition, valid price and stock quantity, and a product photo.');
+    if (!form.name.trim() || !form.brand.trim() || !form.category || !form.condition || (form.listingGroup === 'goodies' && !form.conditionNotes.trim()) || !form.images.length || !Number.isFinite(price) || price <= 0 || !Number.isInteger(stock) || stock < 0) {
+      setFormError('Add a name, brand, category, condition, valid price and stock quantity, and at least one product photo.');
       return;
     }
     const product: Omit<Product, 'id'> = {
       name: form.name.trim(),
       brand: form.brand.trim(),
-      serialNumber: form.serialNumber.trim(),
       price,
       oldPrice: form.oldPrice ? Number(form.oldPrice) : undefined,
       category: form.category,
       condition: form.condition,
       conditionNotes: form.conditionNotes.trim(),
       stock,
-      image: form.imageUrl,
+      image: form.images[0],
+      images: form.images,
       listingGroup: form.listingGroup,
       emoji: '●',
       rating: 0,
@@ -239,6 +270,8 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
   function openSaleRecord(product: Product) {
     setSaleProduct(product);
     setSalePrice(String(product.price));
+    setSaleSerialNumber('');
+    setSaleHasNoIdentifier(false);
     setSaleError('');
   }
 
@@ -250,10 +283,15 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
       setSaleError('Enter the final amount received for this sale.');
       return;
     }
+    const serialNumber = saleHasNoIdentifier ? null : saleSerialNumber.trim();
+    if (serialNumber !== null && !serialNumber) {
+      setSaleError('Enter the IMEI or serial number, or choose “This item has no identifier”.');
+      return;
+    }
     setSaleBusy(true);
     setSaleError('');
     try {
-      await onMarkSold(saleProduct.id, price);
+      await onMarkSold(saleProduct.id, price, serialNumber);
       await refreshInventory();
       await refreshSales();
       setSaleProduct(null);
@@ -374,7 +412,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
               {inventoryLoading ? <p className="admin-inventory-empty">Loading inventory…</p> : visibleProducts.length ? (
                 <div className="admin-table-wrap"><table className="admin-product-table admin-inventory-table"><thead><tr><th>Product</th><th>Section</th><th>Condition</th><th>Stock</th><th>Price</th><th>Actions</th></tr></thead><tbody>
                   {visibleProducts.map(product => <tr key={product.id}>
-                    <td><div className="admin-product-cell">{product.image ? <img src={product.image} alt=""/> : <span className="admin-product-placeholder">CT</span>}<span><strong>{product.name}</strong><small>{product.brand} · {product.category}</small><small>IMEI / serial: {product.serialNumber || 'Not recorded'}</small></span></div></td>
+                    <td><div className="admin-product-cell">{product.image ? <img src={product.image} alt=""/> : <span className="admin-product-placeholder">CT</span>}<span><strong>{product.name}</strong><small>{product.brand} · {product.category}</small><small>{product.images?.length || (product.image ? 1 : 0)} product photo{(product.images?.length || (product.image ? 1 : 0)) === 1 ? '' : 's'}</small></span></div></td>
                     <td><span className={`admin-section-pill ${product.listingGroup === 'goodies' ? 'goodies' : ''}`}>{product.listingGroup === 'goodies' ? 'Goodies' : 'Devices'}</span></td>
                     <td>{product.condition || '—'}</td>
                     <td><span className={`admin-stock ${((product.stock ?? 0) <= 1) ? 'low' : ''}`}>{product.stock ?? 0} {((product.stock ?? 0) === 1) ? 'unit' : 'units'}</span></td>
@@ -387,7 +425,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
               <div className="admin-inventory-heading"><div><h2>Recorded sales</h2><p>Sold inventory stays in Firestore and is listed here for reference.</p></div><button className="admin-refresh-button" onClick={() => void refreshSales()} disabled={salesLoading}>{salesLoading ? 'Refreshing…' : '↻ Refresh'}</button></div>
               {inventoryError && <p role="alert" className="admin-inventory-error">{inventoryError}</p>}
               {salesLoading ? <p className="admin-inventory-empty">Loading sales…</p> : sales.length ? <div className="admin-table-wrap"><table className="admin-product-table admin-sales-table"><thead><tr><th>Item sold</th><th>Section</th><th>Sold via</th><th>Quantity</th><th>Final price</th><th>Sale status</th><th>Action</th></tr></thead><tbody>
-                {sales.map(sale => <tr key={sale.id}><td><div className="admin-product-cell">{sale.image ? <img src={sale.image} alt=""/> : <span className="admin-product-placeholder">CT</span>}<span><strong>{sale.productName}</strong><small>{sale.brand} · {sale.condition}</small><small>IMEI / serial: {sale.serialNumber || 'Not recorded'}</small></span></div></td><td><span className={`admin-section-pill ${sale.listingGroup === 'goodies' ? 'goodies' : ''}`}>{sale.listingGroup === 'goodies' ? 'Goodies' : 'Devices'}</span></td><td><span className="admin-sale-channel">WhatsApp</span></td><td>{sale.quantity}</td><td className="admin-price-cell">₦{sale.soldPrice.toLocaleString('en-NG')}</td><td><span className={`admin-sale-status ${sale.reversedAt ? 'reversed' : ''}`}>{sale.reversedAt ? 'Reversed' : 'Completed'}</span>{sale.reversedAt && <small className="admin-reversal-reason">{new Date(sale.reversedAt).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })}{sale.restocked ? ' · Restocked' : ' · Not restocked'}{sale.reversalReason ? ` · ${sale.reversalReason}` : ''}</small>}</td><td>{sale.reversedAt ? <span className="admin-action-done">Recorded</span> : <button className="admin-reverse-button" onClick={() => openReverseSale(sale)}>Reverse sale</button>}</td></tr>)}
+                {sales.map(sale => <tr key={sale.id}><td><div className="admin-product-cell">{sale.image ? <img src={sale.image} alt=""/> : <span className="admin-product-placeholder">CT</span>}<span><strong>{sale.productName}</strong><small>{sale.brand} · {sale.condition}</small><small>IMEI / serial: {sale.serialNumber || (sale.hasNoIdentifier ? 'No identifier' : 'Not recorded')}</small></span></div></td><td><span className={`admin-section-pill ${sale.listingGroup === 'goodies' ? 'goodies' : ''}`}>{sale.listingGroup === 'goodies' ? 'Goodies' : 'Devices'}</span></td><td><span className="admin-sale-channel">WhatsApp</span></td><td>{sale.quantity}</td><td className="admin-price-cell">₦{sale.soldPrice.toLocaleString('en-NG')}</td><td><span className={`admin-sale-status ${sale.reversedAt ? 'reversed' : ''}`}>{sale.reversedAt ? 'Reversed' : 'Completed'}</span>{sale.reversedAt && <small className="admin-reversal-reason">{new Date(sale.reversedAt).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })}{sale.restocked ? ' · Restocked' : ' · Not restocked'}{sale.reversalReason ? ` · ${sale.reversalReason}` : ''}</small>}</td><td>{sale.reversedAt ? <span className="admin-action-done">Recorded</span> : <button className="admin-reverse-button" onClick={() => openReverseSale(sale)}>Reverse sale</button>}</td></tr>)}
               </tbody></table></div> : <div className="admin-inventory-empty"><strong>No sales recorded yet</strong><span>When a device sells on WhatsApp, mark it as sold from your inventory to keep a record here.</span></div>}
             </section>}
           </div>
@@ -404,8 +442,6 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
             <div className="grid gap-4 px-6 py-5 sm:grid-cols-2">
               <label className="text-sm font-semibold text-slate-700">Device name *<input className={`${INPUT_CLASS} mt-1.5`} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} placeholder="iPhone 15 Pro" /></label>
               <label className="text-sm font-semibold text-slate-700">Brand *<input className={`${INPUT_CLASS} mt-1.5`} value={form.brand} onChange={event => setForm({ ...form, brand: event.target.value })} placeholder="Apple" /></label>
-              <label className="text-sm font-semibold text-slate-700">IMEI or serial number *<input className={`${INPUT_CLASS} mt-1.5`} value={form.serialNumber} onChange={event => setForm({ ...form, serialNumber: event.target.value })} placeholder="Device identifier" autoComplete="off" /></label>
-              <p className="self-center text-xs leading-5 text-slate-500">Stored in the private admin records. It is not sent to or shown on the public storefront.</p>
               <label className="text-sm font-semibold text-slate-700">Price (₦) *<input className={`${INPUT_CLASS} mt-1.5`} type="number" min="1" value={form.price} onChange={event => setForm({ ...form, price: event.target.value })} placeholder="850000" /></label>
               <label className="text-sm font-semibold text-slate-700">Previous price (₦)<input className={`${INPUT_CLASS} mt-1.5`} type="number" min="0" value={form.oldPrice} onChange={event => setForm({ ...form, oldPrice: event.target.value })} placeholder="Optional" /></label>
               <label className="text-sm font-semibold text-slate-700">Category *<select className={`${INPUT_CLASS} mt-1.5`} value={form.category} onChange={event => setForm({ ...form, category: event.target.value })}><option value="">Select</option>{['phones', 'laptops', 'tablets', 'audio', 'wearables', 'cameras', 'accessories', 'smart-home'].map(category => <option key={category} value={category}>{category}</option>)}</select></label>
@@ -415,20 +451,28 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
               <label className="text-sm font-semibold text-slate-700">Quantity in stock *<input className={`${INPUT_CLASS} mt-1.5`} type="number" min="0" step="1" value={form.stock} onChange={event => setForm({ ...form, stock: event.target.value })} /></label>
               <label className="text-sm font-semibold text-slate-700">Store badge<select className={`${INPUT_CLASS} mt-1.5`} value={form.badge} onChange={event => setForm({ ...form, badge: event.target.value })}><option value="">No badge</option><option value="New arrival">New arrival</option><option value="Popular">Popular</option><option value="Good value">Good value</option></select></label>
               <div className="sm:col-span-2">
-                <label className="text-sm font-semibold text-slate-700">Product photo *</label>
-                <div className="mt-1.5 flex flex-wrap items-center gap-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-                  {form.imageUrl && <img src={form.imageUrl} alt="Selected product preview" className="h-20 w-24 rounded-lg bg-white object-cover" />}
-                  <div className="min-w-0 flex-1">
-                    <label className="inline-flex cursor-pointer items-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-blue-800 ring-1 ring-slate-200 hover:bg-blue-50">
-                      {uploadBusy ? 'Uploading photo…' : form.imageUrl ? 'Choose another photo' : 'Upload a photo'}
-                      <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" className="sr-only" disabled={uploadBusy} onChange={event => void uploadImage(event.target.files?.[0])} />
-                    </label>
-                    <p className="mt-2 text-xs leading-5 text-slate-500">Choose a product image up to 8 MB. It uploads to Cloudinary; Firestore stores the resulting image URL.</p>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-sm font-semibold text-slate-700">Product photos *</label>
+                  <span className="text-xs text-slate-500">{form.images.length}/3 added</span>
+                </div>
+                <div className="mt-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                  {form.images.length > 0 && <div className="mb-4 grid grid-cols-3 gap-3">
+                    {form.images.map((imageUrl, index) => <div key={`${imageUrl}-${index}`} className="relative min-w-0">
+                      <img src={imageUrl} alt={`Product view ${index + 1}`} className="h-24 w-full rounded-lg bg-white object-cover" />
+                      <span className="mt-1 block text-center text-xs text-slate-500">Photo {index + 1}{index === 0 ? ' · Main' : ''}</span>
+                      <button type="button" onClick={() => removeImage(index)} aria-label={`Remove photo ${index + 1}`} className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-full bg-white/95 text-sm text-slate-700 shadow">×</button>
+                    </div>)}
+                  </div>}
+                  <label className={`inline-flex cursor-pointer items-center rounded-lg bg-white px-3 py-2 text-sm font-semibold text-blue-800 ring-1 ring-slate-200 hover:bg-blue-50 ${form.images.length >= 3 || uploadBusy ? 'pointer-events-none opacity-50' : ''}`}>
+                    {uploadBusy ? 'Uploading photos…' : 'Add photos'}
+                    <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple className="sr-only" disabled={uploadBusy || form.images.length >= 3} onChange={event => { void uploadImages(event.target.files); event.currentTarget.value = ''; }} />
+                  </label>
+                  <p className="mt-2 text-xs leading-5 text-slate-500">Add up to three photos, up to 8 MB each. They upload to Cloudinary; Firestore stores their URLs.</p>
+                  <div className="mt-3 flex gap-2">
+                    <input className={`${INPUT_CLASS} min-w-0 flex-1 font-normal`} type="url" value={form.imageUrlDraft} onChange={event => setForm({ ...form, imageUrlDraft: event.target.value })} placeholder="Add a hosted image URL" aria-label="Hosted image URL" />
+                    <button type="button" onClick={addImageUrl} disabled={form.images.length >= 3 || !form.imageUrlDraft.trim()} className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-blue-800 disabled:opacity-50">Add URL</button>
                   </div>
                 </div>
-                <label className="mt-3 block text-xs font-semibold text-slate-500">Or paste an existing hosted image URL
-                  <input className={`${INPUT_CLASS} mt-1.5 font-normal`} type="url" value={form.imageUrl} onChange={event => setForm({ ...form, imageUrl: event.target.value })} placeholder="https://res.cloudinary.com/..." />
-                </label>
               </div>
               {formError && <p role="alert" className="sm:col-span-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{formError}</p>}
             </div>
@@ -443,12 +487,20 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
       {saleProduct && (
         <div className="admin-modal-backdrop fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !saleBusy) setSaleProduct(null); }}>
           <form onSubmit={recordSale} className="admin-modal my-6 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-slate-100 px-6 py-5"><p className="text-xs font-bold uppercase tracking-[.15em] text-blue-700">WHATSAPP SALE</p><h2 className="mt-2 text-xl font-bold text-slate-900">Record this sale</h2><p className="mt-1 text-sm text-slate-500">{saleProduct.name} · {saleProduct.condition}</p></div>
+            <div className="border-b border-slate-100 px-6 py-5"><p className="text-xs font-bold uppercase tracking-[.15em] text-blue-700">WHATSAPP SALE</p><h2 className="mt-2 text-xl font-bold text-slate-900">Confirm the item sold</h2><p className="mt-1 text-sm text-slate-500">Check the device details, then record its identifier and sale amount.</p></div>
             <div className="space-y-4 px-6 py-5">
+              <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                {saleProduct.image && <img src={saleProduct.image} alt="" className="h-16 w-16 rounded-lg bg-white object-cover" />}
+                <div className="min-w-0"><strong className="block text-sm text-slate-900">{saleProduct.name}</strong><span className="mt-1 block text-xs text-slate-600">{saleProduct.brand} · {saleProduct.category} · {saleProduct.condition}</span><span className="mt-1 block text-xs text-slate-600">{saleProduct.listingGroup === 'goodies' ? 'Goodies' : 'Devices'} · {saleProduct.stock ?? 0} currently in stock</span><span className="mt-1 block text-sm font-semibold text-blue-900">Listed at ₦{saleProduct.price.toLocaleString('en-NG')}</span></div>
+              </div>
+              <label className="block text-sm font-semibold text-slate-700">IMEI or serial number
+                <input className={`${INPUT_CLASS} mt-1.5`} value={saleSerialNumber} onChange={event => setSaleSerialNumber(event.target.value)} placeholder="Enter the identifier for this unit" autoComplete="off" required={!saleHasNoIdentifier} disabled={saleHasNoIdentifier} />
+              </label>
+              <label className="flex items-start gap-2 rounded-xl border border-slate-200 p-3 text-sm text-slate-700"><input type="checkbox" className="mt-1 accent-blue-800" checked={saleHasNoIdentifier} onChange={event => { setSaleHasNoIdentifier(event.target.checked); if (event.target.checked) setSaleSerialNumber(''); }} /><span><strong>This item has no identifier</strong><small className="mt-1 block text-xs text-slate-500">Use for accessories or other items without an IMEI or serial number.</small></span></label>
               <label className="block text-sm font-semibold text-slate-700">Final amount received (₦)
                 <input className={`${INPUT_CLASS} mt-1.5`} type="number" min="0" step="1" value={salePrice} onChange={event => setSalePrice(event.target.value)} required />
               </label>
-              <p className="rounded-xl bg-blue-50 p-3 text-xs leading-5 text-blue-900">This adds a permanent WhatsApp sale record and reduces the available stock by one. The product record will not be deleted.</p>
+              <p className="rounded-xl bg-blue-50 p-3 text-xs leading-5 text-blue-900">This stores the identifier in the private sale record and reduces available stock by one. It is never shown in the public catalogue.</p>
               {saleError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{saleError}</p>}
             </div>
             <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4">

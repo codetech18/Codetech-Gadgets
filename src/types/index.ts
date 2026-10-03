@@ -14,12 +14,12 @@ export interface Product {
   reviews: number;
   badge?: BadgeType;
   image?: string;
+  images?: string[];
   condition?: string;
   conditionNotes?: string;
   listingGroup?: 'devices' | 'goodies';
   stock?: number;
   listingStatus?: 'available' | 'out_of_stock' | 'sold';
-  serialNumber?: string;
   backInStock?: boolean;
 }
 
@@ -28,6 +28,7 @@ export interface SaleRecord {
   productId: string;
   productName: string;
   serialNumber: string;
+  hasNoIdentifier?: boolean;
   brand: string;
   category: string;
   listingGroup: 'devices' | 'goodies';

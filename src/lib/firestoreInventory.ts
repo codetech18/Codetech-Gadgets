@@ -1,10 +1,11 @@
-import { collection, doc, getDocs, orderBy, query, runTransaction, serverTimestamp, writeBatch } from 'firebase/firestore';
+import { collection, deleteField, doc, getDocs, orderBy, query, runTransaction, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { Product, SaleRecord } from '../types';
 import { getDatabase } from './firebase';
 
 export type ProductDraft = Omit<Product, 'id'>;
 
 function productDocument(product: ProductDraft) {
+  const images = (product.images?.length ? product.images : (product.image ? [product.image] : [])).slice(0, 3);
   return {
     name: product.name.trim(),
     brand: product.brand.trim(),
@@ -18,14 +19,8 @@ function productDocument(product: ProductDraft) {
     status: product.stock && product.stock > 0 ? 'available' : 'out_of_stock',
     featured: Boolean(product.badge),
     badge: product.badge ?? null,
-    imageUrl: product.image ?? '',
-    updatedAt: serverTimestamp(),
-  };
-}
-
-function privateProductDocument(product: ProductDraft) {
-  return {
-    serialNumber: product.serialNumber?.trim() ?? '',
+    imageUrl: images[0] ?? '',
+    imageUrls: images,
     updatedAt: serverTimestamp(),
   };
 }
@@ -35,7 +30,6 @@ export async function createInventoryProduct(product: ProductDraft) {
   const productRef = doc(collection(database, 'products'));
   const batch = writeBatch(database);
   batch.set(productRef, { ...productDocument(product), createdAt: serverTimestamp() });
-  batch.set(doc(database, 'privateProductDetails', productRef.id), { ...privateProductDocument(product), createdAt: serverTimestamp() });
   await batch.commit();
   return productRef;
 }
@@ -43,18 +37,17 @@ export async function createInventoryProduct(product: ProductDraft) {
 export async function updateInventoryProduct(id: string, product: ProductDraft) {
   const database = getDatabase();
   const batch = writeBatch(database);
-  batch.update(doc(database, 'products', id), productDocument(product));
-  batch.set(doc(database, 'privateProductDetails', id), privateProductDocument(product), { merge: true });
+  batch.update(doc(database, 'products', id), {
+    ...productDocument(product),
+    serialNumber: deleteField(),
+    imei: deleteField(),
+  });
   return batch.commit();
 }
 
-export async function loadPrivateProductDetails() {
-  const snapshot = await getDocs(collection(getDatabase(), 'privateProductDetails'));
-  return new Map(snapshot.docs.map(document => [document.id, String(document.data().serialNumber ?? '')]));
-}
-
-export async function markInventoryProductSold(id: string, soldPrice: number) {
+export async function markInventoryProductSold(id: string, soldPrice: number, serialNumber: string | null) {
   if (!Number.isFinite(soldPrice) || soldPrice < 0) throw new Error('Enter a valid final sale price.');
+  if (serialNumber !== null && !serialNumber.trim()) throw new Error('Enter the sold item identifier or choose that it has no identifier.');
   const database = getDatabase();
   const productRef = doc(database, 'products', id);
   const saleRef = doc(collection(database, 'sales'));
@@ -65,9 +58,6 @@ export async function markInventoryProductSold(id: string, soldPrice: number) {
 
     const product = snapshot.data();
     if (product.status === 'sold') throw new Error('This item has already been marked as sold.');
-    const privateRef = doc(database, 'privateProductDetails', id);
-    const privateSnapshot = await transaction.get(privateRef);
-
     const stockBefore = Math.max(0, Number(product.stockQuantity ?? 0));
     const stockAfter = Math.max(0, stockBefore - 1);
     transaction.update(productRef, {
@@ -80,12 +70,14 @@ export async function markInventoryProductSold(id: string, soldPrice: number) {
     transaction.set(saleRef, {
       productId: snapshot.id,
       productName: String(product.name ?? product.title ?? 'Product'),
-      serialNumber: String(privateSnapshot.data()?.serialNumber ?? ''),
+      serialNumber: serialNumber?.trim() ?? '',
+      hasNoIdentifier: serialNumber === null,
       brand: String(product.brand ?? ''),
       category: String(product.category ?? ''),
       listingGroup: product.listingGroup === 'goodies' ? 'goodies' : 'devices',
       condition: String(product.condition ?? ''),
       imageUrl: String(product.imageUrl ?? product.image ?? ''),
+      imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls : (product.imageUrl ? [String(product.imageUrl)] : []),
       quantity: 1,
       stockBefore,
       soldPriceNgn: soldPrice,
@@ -156,6 +148,7 @@ export async function loadSalesHistory(): Promise<SaleRecord[]> {
       productId: String(record.productId ?? ''),
       productName: String(record.productName ?? 'Product'),
       serialNumber: String(record.serialNumber ?? ''),
+      hasNoIdentifier: Boolean(record.hasNoIdentifier),
       brand: String(record.brand ?? ''),
       category: String(record.category ?? ''),
       listingGroup: record.listingGroup === 'goodies' ? 'goodies' : 'devices',

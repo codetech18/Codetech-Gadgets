@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Product } from '../types';
 
 const WHATSAPP_NUMBER = '2349058977101';
@@ -22,16 +23,28 @@ function whatsappLink(product: Product) {
 }
 
 export default function ProductDetail({ product, onBack, onSwap, onAddToCart }: ProductDetailProps) {
+  const images = product.images?.length ? product.images : product.image ? [product.image] : [];
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  useEffect(() => setActiveImageIndex(0), [product.id]);
+  const activeImage = images[activeImageIndex] ?? images[0];
+
   return (
     <main className="product-page">
       <div className="product-page-inner">
         <button className="product-back-link" onClick={onBack}>← Back to {product.listingGroup === 'goodies' ? 'Goodies' : 'Devices'}</button>
         <div className="product-detail-layout">
-          <div className="product-detail-image">
-            {product.image ? <img src={product.image} alt={product.name} /> : <div className="device-image-placeholder">CodeTech Gadgets</div>}
-            {product.badge && <span className="device-badge">{product.badge}</span>}
-            <span className={`device-condition-badge ${product.listingGroup === 'goodies' ? 'goodies' : /brand\s*new/i.test(product.condition || '') ? 'brand-new' : ''}`}>{product.listingGroup === 'goodies' ? 'Goodies' : /brand\s*new/i.test(product.condition || '') ? 'Brand New' : 'UK Used'}</span>
-            {product.backInStock && <span className="device-restock-badge">Back in stock</span>}
+          <div className="product-detail-gallery">
+            <div className="product-detail-image">
+              {activeImage ? <img src={activeImage} alt={`${product.name}, photo ${activeImageIndex + 1}`} /> : <div className="device-image-placeholder">CodeTech Gadgets</div>}
+              {product.badge && <span className="device-badge">{product.badge}</span>}
+              <span className={`device-condition-badge ${product.listingGroup === 'goodies' ? 'goodies' : /brand\s*new/i.test(product.condition || '') ? 'brand-new' : ''}`}>{product.listingGroup === 'goodies' ? 'Goodies' : /brand\s*new/i.test(product.condition || '') ? 'Brand New' : 'UK Used'}</span>
+              {product.backInStock && <span className="device-restock-badge">Back in stock</span>}
+            </div>
+            {images.length > 1 && <div className="product-image-thumbnails" aria-label="Product photos">
+              {images.map((image, index) => <button key={`${image}-${index}`} type="button" onClick={() => setActiveImageIndex(index)} className={index === activeImageIndex ? 'selected' : ''} aria-label={`Show product photo ${index + 1}`} aria-pressed={index === activeImageIndex}>
+                <img src={image} alt="" />
+              </button>)}
+            </div>}
           </div>
           <section className="product-detail-copy" aria-labelledby="product-title">
             <p className="eyebrow">{product.brand} <span aria-hidden="true">·</span> {product.condition || 'Condition details available'}</p>

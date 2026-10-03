@@ -17,6 +17,7 @@ type CatalogRecord = {
   featured?: boolean;
   badge?: string | null;
   imageUrl?: string;
+  imageUrls?: string[];
   image?: string;
   rating?: number | string;
   reviews?: number | string;
@@ -26,12 +27,14 @@ type CatalogRecord = {
   createdAt?: { toMillis?: () => number };
 };
 
-function toProduct(id: string, record: CatalogRecord, serialNumber?: string): Product | null {
+function toProduct(id: string, record: CatalogRecord): Product | null {
     const stock = Number(record.stockQuantity ?? record.stock ?? 0);
     const price = Number(record.priceNgn ?? record.price ?? 0);
     const name = record.name ?? record.title ?? '';
     if (!name || !record.brand || !record.category || !Number.isFinite(price) || price <= 0) return null;
 
+    const images = (Array.isArray(record.imageUrls) ? record.imageUrls : []).filter((image): image is string => typeof image === 'string' && Boolean(image));
+    const primaryImage = images[0] ?? record.imageUrl ?? record.image;
     const product: Product = {
       id,
       name,
@@ -42,14 +45,14 @@ function toProduct(id: string, record: CatalogRecord, serialNumber?: string): Pr
       rating: Number(record.rating ?? 0),
       reviews: Number(record.reviews ?? 0),
       badge: record.badge || (record.featured ? 'Featured' : undefined),
-      image: record.imageUrl ?? record.image,
+      image: primaryImage,
+      images: images.length ? images : (primaryImage ? [primaryImage] : []),
       condition: record.condition ?? 'Quality checked',
       conditionNotes: record.conditionNotes ?? '',
       listingGroup: record.listingGroup === 'goodies' ? 'goodies' : 'devices',
       stock,
       listingStatus: record.status ?? (stock > 0 ? 'available' : 'out_of_stock'),
       backInStock: Boolean(record.backInStock),
-      ...(serialNumber !== undefined ? { serialNumber } : {}),
     };
     const oldPrice = Number(record.oldPriceNgn ?? 0);
     if (oldPrice > 0) product.oldPrice = oldPrice;
@@ -77,13 +80,9 @@ export function subscribeFirestoreCatalog(onUpdate: (products: Product[]) => voi
 }
 
 export async function loadFirestoreInventory(): Promise<Product[]> {
-  const [snapshot, privateSnapshot] = await Promise.all([
-    getDocs(collection(getDatabase(), 'products')),
-    getDocs(collection(getDatabase(), 'privateProductDetails')),
-  ]);
-  const privateDetails = new Map(privateSnapshot.docs.map(document => [document.id, String(document.data().serialNumber ?? '')]));
+  const snapshot = await getDocs(collection(getDatabase(), 'products'));
   return snapshot.docs
-    .map(document => ({ product: toProduct(document.id, document.data() as CatalogRecord, privateDetails.get(document.id) ?? ''), record: document.data() as CatalogRecord }))
+    .map(document => ({ product: toProduct(document.id, document.data() as CatalogRecord), record: document.data() as CatalogRecord }))
     .filter((item): item is { product: Product; record: CatalogRecord } => item.product !== null)
     .sort((a, b) => Number(Boolean(b.record.featured)) - Number(Boolean(a.record.featured)) || (b.record.createdAt?.toMillis?.() ?? 0) - (a.record.createdAt?.toMillis?.() ?? 0))
     .map(({ product }) => product);

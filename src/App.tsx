@@ -168,10 +168,10 @@ export default function App() {
     setCatalogStatus('live');
     showToast('Product updated.');
   }
-  async function markProductSold(id: Product['id'], soldPrice: number) {
+  async function markProductSold(id: Product['id'], soldPrice: number, serialNumber: string | null) {
     if (typeof id !== 'string') throw new Error('This sample item is not saved in Firestore yet.');
     const { markInventoryProductSold } = await import('./lib/firestoreInventory');
-    await markInventoryProductSold(id, soldPrice);
+    await markInventoryProductSold(id, soldPrice, serialNumber);
     const { loadFirestoreCatalog } = await import('./lib/firestoreCatalog');
     setProducts(await loadFirestoreCatalog());
     setCatalogStatus('live');

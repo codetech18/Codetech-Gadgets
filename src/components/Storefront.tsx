@@ -30,6 +30,7 @@ function Arrow({ diagonal = false }: { diagonal?: boolean }) {
 }
 
 function DeviceCard({ product, onOpen }: { product: Product; onOpen: () => void }) {
+  const coverImage = product.images?.[0] ?? product.image;
   const itemLabel = product.listingGroup === 'goodies'
     ? 'Goodies'
     : /brand\s*new/i.test(product.condition || '')
@@ -43,7 +44,7 @@ function DeviceCard({ product, onOpen }: { product: Product; onOpen: () => void 
         {product.badge && <span className="device-badge">{product.badge}</span>}
         <span className={`device-condition-badge ${itemLabel === 'Goodies' ? 'goodies' : itemLabel === 'Brand New' ? 'brand-new' : ''}`}>{itemLabel}</span>
         {product.backInStock && <span className="device-restock-badge">Back in stock</span>}
-        {product.image ? <img className="device-image" src={product.image} alt={product.name} loading="lazy" /> : <div className="device-image-placeholder">CodeTech Gadgets</div>}
+        {coverImage ? <img className="device-image" src={coverImage} alt={product.name} loading="lazy" /> : <div className="device-image-placeholder">CodeTech Gadgets</div>}
         <span className="device-open">View details <Arrow diagonal /></span>
       </div>
       <div className="device-copy">
