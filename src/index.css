@@ -82,8 +82,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .category-tabs button.active::after { content: ''; position: absolute; bottom: -15px; left: 0; right: 0; height: 2px; background: #3158be; }
 .results-count { color: #97a0ae; font-size: 12px; white-space: nowrap; }
 .device-grid { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 17px; }
-.device-card { min-width: 0; padding: 0; text-align: left; border: 0; background: #fff; color: inherit; }
-.device-image-wrap { position: relative; height: clamp(195px,22vw,285px); overflow: hidden; background: #f3f4f6; }
+.device-card { min-width: 0; display: flex; flex-direction: column; align-items: stretch; padding: 0; text-align: left; border: 0; background: #fff; color: inherit; }
+.device-image-wrap { position: relative; flex: 0 0 auto; height: clamp(195px,22vw,285px); overflow: hidden; background: #f3f4f6; }
 .device-image { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .6s cubic-bezier(.2,.7,.2,1); }
 .device-image-placeholder { width: 100%; height: 100%; min-height: 195px; display: grid; place-items: center; background: linear-gradient(145deg,#f1f3f7,#e5eaf2); color: #697897; font-family: Manrope,sans-serif; font-size: 13px; font-weight: 700; letter-spacing: .08em; }
 .device-card:hover .device-image { transform: scale(1.045); }
@@ -94,13 +94,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .device-restock-badge { position: absolute; bottom: 12px; left: 12px; z-index: 1; padding: 6px 8px; background: #176c4d; color: #fff; font-size: 11px; font-weight: 750; }
 .device-open { position: absolute; left: 10px; right: 10px; bottom: 10px; min-height: 35px; display: flex; align-items: center; justify-content: space-between; padding: 0 11px; background: rgba(255,255,255,.95); color: #243f87; font-size: 12px; font-weight: 700; opacity: 0; transform: translateY(5px); transition: opacity .2s, transform .2s; }
 .device-card:hover .device-open, .device-card:focus-visible .device-open { opacity: 1; transform: translateY(0); }
-.device-copy { padding: 13px 1px 0; }
+.device-copy { flex: 1; display: flex; flex-direction: column; align-items: stretch; padding: 13px 1px 0; }
 .device-meta { display: flex; justify-content: space-between; gap: 8px; color: #8290a7; font-size: 12px; }
 .device-meta span:first-child { color: #3b5798; font-weight: 700; }
 .device-meta span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .device-copy h3 { margin: 7px 0 9px; color: #1d2940; font-family: Manrope,sans-serif; font-size: 16px; letter-spacing: -.025em; font-weight: 700; line-height: 1.4; }
 .device-condition-note { display: -webkit-box; overflow: hidden; margin: -6px 0 10px; color: #7b5b26; font-size: 12px; line-height: 1.5; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.device-price-line { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.device-price-line { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: auto; }
 .device-price-line strong { color: #192d5c; font-family: Manrope,sans-serif; font-size: 17px; }
 .device-price-line span { color: #9aa3b0; font-size: 12px; }
 .empty-catalog { min-height: 200px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: #52617b; font-size: 14px; }
