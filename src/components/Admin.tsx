@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut, User as FirebaseUser } from 'firebase/auth';
 import { Product, SaleRecord } from '../types';
 import { getFirebaseAuth } from '../lib/firebase';
+import { displayImageUrl } from '../lib/displayImageUrl';
 
 interface AdminProps {
   onAddProduct: (product: Omit<Product, 'id'>) => Promise<void>;
@@ -412,7 +413,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
               {inventoryLoading ? <p className="admin-inventory-empty">Loading inventory…</p> : visibleProducts.length ? (
                 <div className="admin-table-wrap"><table className="admin-product-table admin-inventory-table"><thead><tr><th>Product</th><th>Section</th><th>Condition</th><th>Stock</th><th>Price</th><th>Actions</th></tr></thead><tbody>
                   {visibleProducts.map(product => <tr key={product.id}>
-                    <td><div className="admin-product-cell">{product.image ? <img src={product.image} alt=""/> : <span className="admin-product-placeholder">CT</span>}<span><strong>{product.name}</strong><small>{product.brand} · {product.category}</small><small>{product.images?.length || (product.image ? 1 : 0)} product photo{(product.images?.length || (product.image ? 1 : 0)) === 1 ? '' : 's'}</small></span></div></td>
+                    <td><div className="admin-product-cell">{product.image ? <img src={displayImageUrl(product.image)} alt=""/> : <span className="admin-product-placeholder">CT</span>}<span><strong>{product.name}</strong><small>{product.brand} · {product.category}</small><small>{product.images?.length || (product.image ? 1 : 0)} product photo{(product.images?.length || (product.image ? 1 : 0)) === 1 ? '' : 's'}</small></span></div></td>
                     <td><span className={`admin-section-pill ${product.listingGroup === 'goodies' ? 'goodies' : ''}`}>{product.listingGroup === 'goodies' ? 'Goodies' : 'Devices'}</span></td>
                     <td>{product.condition || '—'}</td>
                     <td><span className={`admin-stock ${((product.stock ?? 0) <= 1) ? 'low' : ''}`}>{product.stock ?? 0} {((product.stock ?? 0) === 1) ? 'unit' : 'units'}</span></td>
@@ -458,7 +459,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
                 <div className="mt-2 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
                   {form.images.length > 0 && <div className="mb-4 grid grid-cols-3 gap-3">
                     {form.images.map((imageUrl, index) => <div key={`${imageUrl}-${index}`} className="relative min-w-0">
-                      <img src={imageUrl} alt={`Product view ${index + 1}`} className="h-24 w-full rounded-lg bg-white object-cover" />
+                      <img src={displayImageUrl(imageUrl)} alt={`Product view ${index + 1}`} className="h-24 w-full rounded-lg bg-white object-cover" />
                       <span className="mt-1 block text-center text-xs text-slate-500">Photo {index + 1}{index === 0 ? ' · Main' : ''}</span>
                       <button type="button" onClick={() => removeImage(index)} aria-label={`Remove photo ${index + 1}`} className="absolute right-1 top-1 grid h-7 w-7 place-items-center rounded-full bg-white/95 text-sm text-slate-700 shadow">×</button>
                     </div>)}

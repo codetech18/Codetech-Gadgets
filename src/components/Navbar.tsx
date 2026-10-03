@@ -29,7 +29,6 @@ export default function Navbar({ currentPage, cartCount, onNavigate, onScrollToP
         <button className={currentPage === 'swap' ? 'nav-active' : ''} onClick={() => go('swap')}>Swap</button>
       </nav>
       <div className="header-actions">
-        <button className="header-sell" onClick={() => go('sell')}>Sell your device <span aria-hidden="true">↗</span></button>
         <button className="cart-button" onClick={() => go('cart')} aria-label={`Purchase request list, ${cartCount} items`}>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8h14l1 12H4L5 8Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></svg>
           <span>Request list</span>{cartCount > 0 && <b>{cartCount}</b>}
@@ -38,13 +37,12 @@ export default function Navbar({ currentPage, cartCount, onNavigate, onScrollToP
       </div>
     </header>
     {menuOpen && <div className="mobile-menu">
-      <button onClick={() => go('home')}>Home <span>01</span></button>
-      <button onClick={goShop}>Devices <span>02</span></button>
-      <button onClick={() => go('goodies')}>Goodies <span>03</span></button>
-      <button onClick={() => go('sell')}>Sell your device <span>04</span></button>
-      <button onClick={() => go('swap')}>Swap & upgrade <span>05</span></button>
-      <button onClick={() => go('cart')}>Purchase request list <span>{cartCount}</span></button>
-      <a href="https://wa.me/2349058977101" target="_blank" rel="noreferrer">Talk to our team ↗</a>
+      <button onClick={() => go('home')}>Home</button>
+      <button onClick={goShop}>Devices</button>
+      <button onClick={() => go('goodies')}>Goodies</button>
+      <button onClick={() => go('sell')}>Sell</button>
+      <button onClick={() => go('swap')}>Swap</button>
+      <a href="https://wa.me/2349058977101" target="_blank" rel="noreferrer">WhatsApp ↗</a>
     </div>}
   </>;
 }

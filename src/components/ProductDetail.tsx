@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Product } from '../types';
+import { displayImageUrl } from '../lib/displayImageUrl';
 
 const WHATSAPP_NUMBER = '2349058977101';
 const money = (amount: number) => `₦${amount.toLocaleString('en-NG')}`;
@@ -35,14 +36,14 @@ export default function ProductDetail({ product, onBack, onSwap, onAddToCart }: 
         <div className="product-detail-layout">
           <div className="product-detail-gallery">
             <div className="product-detail-image">
-              {activeImage ? <img src={activeImage} alt={`${product.name}, photo ${activeImageIndex + 1}`} /> : <div className="device-image-placeholder">CodeTech Gadgets</div>}
+              {activeImage ? <img src={displayImageUrl(activeImage)} alt={`${product.name}, photo ${activeImageIndex + 1}`} /> : <div className="device-image-placeholder">CodeTech Gadgets</div>}
               {product.badge && <span className="device-badge">{product.badge}</span>}
               <span className={`device-condition-badge ${product.listingGroup === 'goodies' ? 'goodies' : /brand\s*new/i.test(product.condition || '') ? 'brand-new' : ''}`}>{product.listingGroup === 'goodies' ? 'Goodies' : /brand\s*new/i.test(product.condition || '') ? 'Brand New' : 'UK Used'}</span>
               {product.backInStock && <span className="device-restock-badge">Back in stock</span>}
             </div>
             {images.length > 1 && <div className="product-image-thumbnails" aria-label="Product photos">
               {images.map((image, index) => <button key={`${image}-${index}`} type="button" onClick={() => setActiveImageIndex(index)} className={index === activeImageIndex ? 'selected' : ''} aria-label={`Show product photo ${index + 1}`} aria-pressed={index === activeImageIndex}>
-                <img src={image} alt="" />
+                <img src={displayImageUrl(image)} alt="" />
               </button>)}
             </div>}
           </div>
@@ -67,7 +68,6 @@ export default function ProductDetail({ product, onBack, onSwap, onAddToCart }: 
               <button className="product-list-button" onClick={() => onAddToCart(product)}>Add to purchase list <span aria-hidden="true">＋</span></button>
               <button className="product-swap-button" onClick={() => onSwap(product)}>Use this device in a swap <span aria-hidden="true">→</span></button>
             </div>
-            <p className="product-payment-note">Online payment and order accounts aren’t available yet. We’ll add online checkout when payment processing is set up.</p>
           </section>
         </div>
       </div>
