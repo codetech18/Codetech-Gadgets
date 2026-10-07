@@ -148,6 +148,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .store-footer > p { margin: 0; color: #8992a1; font-size: 12px; }
 .store-footer > a { color: #2c4b9e; text-decoration: none; font-size: 12px; font-weight: 700; }
 .store-footer > a .store-arrow { padding-left: 6px; }
+.store-footer address { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; color: #667287; font-size: 12px; font-style: normal; line-height: 1.5; }
+.store-footer address strong { color: #26344c; }
 .store-footer > small { grid-column: 1 / -1; border-top: 1px solid #e9edf2; padding-top: 12px; color: #a1a8b4; font-size: 12px; }
 .admin-footer-link { margin-left: 14px; border: 0; padding: 0; background: transparent; color: #7f899a; font-size: inherit; text-decoration: underline; text-underline-offset: 2px; }
 

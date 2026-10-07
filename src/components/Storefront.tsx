@@ -11,7 +11,6 @@ type StorefrontProps = {
   onSell: () => void;
   onSwap: () => void;
   onGoodies: () => void;
-  onAdmin: () => void;
   onOpenProduct: (product: Product) => void;
 };
 
@@ -59,7 +58,7 @@ function DeviceCard({ product, onOpen }: { product: Product; onOpen: () => void 
   );
 }
 
-export default function Storefront({ view, products, catalogStatus, onShop, onSell, onSwap, onGoodies, onAdmin, onOpenProduct }: StorefrontProps) {
+export default function Storefront({ view, products, catalogStatus, onShop, onSell, onSwap, onGoodies, onOpenProduct }: StorefrontProps) {
   const [activeCategory, setActiveCategory] = useState('All devices');
   const [activeCollection, setActiveCollection] = useState<(typeof homeCollections)[number]['value']>('all');
   const [search, setSearch] = useState('');
@@ -133,12 +132,6 @@ export default function Storefront({ view, products, catalogStatus, onShop, onSe
         </article>
       </section>
       </>}
-
-      <footer className="store-footer">
-        <div className="footer-brand"><img src="/codetech-mark.jpg" alt="" /><div><strong>CodeTech Gadgets</strong><span>Buy · Sell · Swap</span></div></div>
-        <a href="https://wa.me/2349058977101" target="_blank" rel="noreferrer">WhatsApp our team <Arrow diagonal /></a>
-        <small>© {new Date().getFullYear()} CodeTech Gadgets <button type="button" className="admin-footer-link" onClick={onAdmin}>Admin</button></small>
-      </footer>
 
     </main>
   );

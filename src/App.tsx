@@ -9,6 +9,7 @@ import Support from './components/Support';
 import Toast from './components/Toast';
 import TradeRequest from './components/TradeRequest';
 import ProductDetail from './components/ProductDetail';
+import StoreFooter from './components/StoreFooter';
 import { unlistedItemEnquiryLink } from './lib/unlistedItemEnquiry';
 
 const Admin = lazy(() => import('./components/Admin'));
@@ -220,7 +221,7 @@ export default function App() {
       {/* HOME */}
       {(page === 'home' || page === 'devices' || page === 'goodies') && (
         <>
-          <Storefront view={page} products={products} catalogStatus={catalogStatus} onShop={scrollToProducts} onSell={() => navigate('sell')} onSwap={() => navigate('swap')} onGoodies={() => navigate('goodies')} onAdmin={() => navigate('admin')} onOpenProduct={openProduct} />
+          <Storefront view={page} products={products} catalogStatus={catalogStatus} onShop={scrollToProducts} onSell={() => navigate('sell')} onSwap={() => navigate('swap')} onGoodies={() => navigate('goodies')} onOpenProduct={openProduct} />
         </>
       )}
 
@@ -248,6 +249,7 @@ export default function App() {
       {/* SUPPORT */}
       {page === 'complaint' && <Support onToast={showToast} />}
 
+      <StoreFooter onAdmin={() => navigate('admin')} />
       <Toast message={toast.msg} visible={toast.visible} />
     </div>
   );
