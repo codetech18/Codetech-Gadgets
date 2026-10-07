@@ -4,7 +4,6 @@ export type BadgeType = string | null;
 
 export interface ProductVariant {
   id: string;
-  color: string;
   storage: string;
   price: number;
   stock: number;
@@ -47,7 +46,6 @@ export interface SaleRecord {
   quantity: number;
   soldPrice: number;
   variantId?: string;
-  variantColor?: string;
   variantStorage?: string;
   saleChannel: 'whatsapp';
   soldAt: string;

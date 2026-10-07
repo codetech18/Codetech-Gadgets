@@ -54,7 +54,7 @@ function toProduct(id: string, record: CatalogRecord): Product | null {
       stock,
       listingStatus: record.status ?? (stock > 0 ? 'available' : 'out_of_stock'),
       backInStock: Boolean(record.backInStock),
-      variants: Array.isArray(record.variants) ? record.variants.filter(variant => variant && typeof variant.id === 'string' && Number.isFinite(Number(variant.price)) && Number.isFinite(Number(variant.stock))).map(variant => ({ id: variant.id, color: String(variant.color ?? ''), storage: String(variant.storage ?? ''), price: Number(variant.price), stock: Number(variant.stock) })) : [],
+      variants: Array.isArray(record.variants) ? record.variants.filter(variant => variant && typeof variant.id === 'string' && Number.isFinite(Number(variant.price)) && Number.isFinite(Number(variant.stock))).map(variant => ({ id: variant.id, storage: String(variant.storage ?? ''), price: Number(variant.price), stock: Number(variant.stock) })) : [],
     };
     const oldPrice = Number(record.oldPriceNgn ?? 0);
     if (oldPrice > 0) product.oldPrice = oldPrice;

@@ -43,7 +43,7 @@ export default function Cart({ cart, onChangeQty, onRemove, onClear, onCheckout,
                 <div className="flex-1 min-w-0">
                   <div className="text-xs uppercase tracking-widest text-blue-400 font-bold mb-0.5">{item.brand}</div>
                   <div className="font-['Manrope'] font-bold text-blue-950 text-sm sm:text-base truncate">{item.name}</div>
-                  {item.selectedVariantId && <div className="text-xs text-slate-500">{(() => { const variant = item.variants?.find(option => option.id === item.selectedVariantId); return variant ? `${variant.color} · ${variant.storage}` : ''; })()}</div>}
+                  {item.selectedVariantId && <div className="text-xs text-slate-500">{item.variants?.find(option => option.id === item.selectedVariantId)?.storage}</div>}
                   <div className="text-blue-600 font-bold text-sm mt-0.5">₦{(item.price * item.qty).toLocaleString()}</div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">

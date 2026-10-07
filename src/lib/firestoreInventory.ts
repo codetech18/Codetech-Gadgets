@@ -65,7 +65,7 @@ export async function markInventoryProductSold(id: string, soldPrice: number, se
     if (product.status === 'sold') throw new Error('This item has already been marked as sold.');
     const variants = Array.isArray(product.variants) ? product.variants as Product['variants'] : [];
     const selectedVariant = variants?.find(variant => variant.id === variantId);
-    if (variants?.length && (!selectedVariant || selectedVariant.stock <= 0)) throw new Error('Choose an available color and storage combination.');
+    if (variants?.length && (!selectedVariant || selectedVariant.stock <= 0)) throw new Error('Choose an available storage option.');
     const stockBefore = Math.max(0, Number(product.stockQuantity ?? 0));
     if (stockBefore <= 0) throw new Error('This item is out of stock.');
     const stockAfter = Math.max(0, stockBefore - 1);
@@ -92,7 +92,6 @@ export async function markInventoryProductSold(id: string, soldPrice: number, se
       imageUrls: Array.isArray(product.imageUrls) ? product.imageUrls : (product.imageUrl ? [String(product.imageUrl)] : []),
       quantity: 1,
       variantId: selectedVariant?.id ?? '',
-      variantColor: selectedVariant?.color ?? '',
       variantStorage: selectedVariant?.storage ?? '',
       stockBefore,
       soldPriceNgn: soldPrice,
@@ -129,7 +128,7 @@ export async function reverseInventorySale(saleId: string, reason: string) {
     const currentStock = Math.max(0, Number(productSnapshot.data().stockQuantity ?? 0));
     const variants = Array.isArray(productSnapshot.data().variants) ? productSnapshot.data().variants as Product['variants'] : [];
     const nextVariants = variants?.map(variant => variant.id === sale.variantId ? { ...variant, stock: variant.stock + 1 } : variant) ?? [];
-    if (sale.variantId && !nextVariants.some(variant => variant.id === sale.variantId)) throw new Error('The original color and storage combination no longer exists.');
+    if (sale.variantId && !nextVariants.some(variant => variant.id === sale.variantId)) throw new Error('The original storage option no longer exists.');
     const availablePrices = nextVariants.filter(variant => variant.stock > 0).map(variant => variant.price);
     transaction.update(productRef!, {
       stockQuantity: currentStock + 1,
@@ -177,7 +176,6 @@ export async function loadSalesHistory(): Promise<SaleRecord[]> {
       quantity: Math.max(1, Number(record.quantity ?? 1)),
       soldPrice: Number(record.soldPriceNgn ?? 0),
       variantId: record.variantId ? String(record.variantId) : undefined,
-      variantColor: record.variantColor ? String(record.variantColor) : undefined,
       variantStorage: record.variantStorage ? String(record.variantStorage) : undefined,
       saleChannel: 'whatsapp',
       soldAt: timestamp?.toDate?.().toISOString() ?? '',

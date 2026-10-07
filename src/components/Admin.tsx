@@ -25,7 +25,7 @@ type ProductForm = {
   images: string[];
   imageUrlDraft: string;
   listingGroup: 'devices' | 'goodies';
-  variants: Array<{ id: string; color: string; storage: string; price: string; stock: string }>;
+  variants: Array<{ id: string; storage: string; price: string; stock: string }>;
 };
 
 type InventoryFilter = 'all' | 'devices' | 'goodies' | 'low-stock';
@@ -52,6 +52,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
   const [editId, setEditId] = useState<Product['id'] | null>(null);
   const [form, setForm] = useState<ProductForm>({ ...EMPTY_FORM });
   const [formError, setFormError] = useState('');
+  const [legacyStorageWarning, setLegacyStorageWarning] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>('all');
@@ -164,11 +165,14 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
     setEditId(null);
     setForm({ ...EMPTY_FORM });
     setFormError('');
+    setLegacyStorageWarning(false);
     setModalOpen(true);
   }
 
   function openEdit(product: Product) {
     setEditId(product.id);
+    const storageSizes = (product.variants ?? []).map(variant => variant.storage.trim().toLowerCase());
+    setLegacyStorageWarning(new Set(storageSizes).size !== storageSizes.length);
     setForm({
       name: product.name,
       brand: product.brand,
@@ -235,13 +239,13 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
   async function saveProduct(event: FormEvent) {
     event.preventDefault();
     const hasVariants = form.variants.length > 0;
-    const variants: ProductVariant[] = form.variants.map(variant => ({ id: variant.id, color: variant.color.trim(), storage: variant.storage.trim(), price: Number(variant.price), stock: Number(variant.stock) }));
+    const variants: ProductVariant[] = form.variants.map(variant => ({ id: variant.id, storage: variant.storage.trim(), price: Number(variant.price), stock: Number(variant.stock) }));
     const availableVariants = variants.filter(variant => variant.stock > 0);
     const price = hasVariants ? Math.min(...(availableVariants.length ? availableVariants : variants).map(variant => variant.price)) : Number(form.price);
     const stock = hasVariants ? variants.reduce((sum, variant) => sum + variant.stock, 0) : Number(form.stock);
-    const duplicateVariants = new Set(variants.map(variant => `${variant.color.toLowerCase()}|${variant.storage.toLowerCase()}`)).size !== variants.length;
-    if (hasVariants && (duplicateVariants || variants.some((variant, index) => !variant.color || !variant.storage || !form.variants[index].stock.trim() || !Number.isFinite(variant.price) || variant.price <= 0 || !Number.isInteger(variant.stock) || variant.stock < 0))) {
-      setFormError('Each color and storage combination needs a unique name, a price above zero, and a valid stock quantity.');
+    const duplicateVariants = new Set(variants.map(variant => variant.storage.toLowerCase())).size !== variants.length;
+    if (hasVariants && (duplicateVariants || variants.some((variant, index) => !variant.storage || !form.variants[index].stock.trim() || !Number.isFinite(variant.price) || variant.price <= 0 || !Number.isInteger(variant.stock) || variant.stock < 0))) {
+      setFormError('Each storage option needs a unique size, a price above zero, and a valid stock quantity.');
       return;
     }
     if (!form.name.trim() || !form.brand.trim() || !form.category || !form.condition || (form.listingGroup === 'goodies' && !form.conditionNotes.trim()) || !form.images.length || !Number.isFinite(price) || price <= 0 || !Number.isInteger(stock) || stock < 0) {
@@ -465,9 +469,10 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
               {form.listingGroup === 'goodies' && <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Condition details customers should know *<textarea className={`${INPUT_CLASS} mt-1.5 min-h-20 resize-y`} value={form.conditionNotes} onChange={event => setForm({ ...form, conditionNotes: event.target.value })} placeholder="Describe any faults, wear, or included accessories clearly." /></label>}
               {form.variants.length === 0 && <label className="text-sm font-semibold text-slate-700">Quantity in stock *<input className={`${INPUT_CLASS} mt-1.5`} type="number" min="0" step="1" value={form.stock} onChange={event => setForm({ ...form, stock: event.target.value })} /></label>}
               {form.listingGroup === 'devices' && <div className="sm:col-span-2 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
-                <div className="flex items-start justify-between gap-3"><div><strong className="text-sm text-blue-950">Colors and storage</strong><p className="mt-1 text-xs text-slate-600">Add one row for every combination you sell. Each row has its own price and quantity.</p></div><button type="button" className="shrink-0 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white" onClick={() => setForm(current => ({ ...current, variants: [...current.variants, { id: crypto.randomUUID(), color: '', storage: '', price: '', stock: '1' }] }))}>+ Add option</button></div>
-                {form.variants.map((variant, index) => <div key={variant.id} className="mt-3 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-[1fr_1fr_1fr_80px_auto]">
-                  {(['color', 'storage', 'price', 'stock'] as const).map(field => <label key={field} className="text-xs font-semibold capitalize text-slate-700">{field === 'price' ? 'Price (₦)' : field}<input className={`${INPUT_CLASS} mt-1`} type={field === 'price' || field === 'stock' ? 'number' : 'text'} min={field === 'price' ? '1' : field === 'stock' ? '0' : undefined} step={field === 'stock' ? '1' : undefined} value={variant[field]} onChange={event => setForm(current => ({ ...current, variants: current.variants.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: event.target.value } : row) }))} placeholder={field === 'color' ? 'Black' : field === 'storage' ? '256GB' : undefined} /></label>)}
+                <div className="flex items-start justify-between gap-3"><div><strong className="text-sm text-blue-950">Storage options and prices</strong><p className="mt-1 text-xs text-slate-600">Add one row for each storage size. Set its price and quantity.</p></div><button type="button" className="shrink-0 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white" onClick={() => setForm(current => ({ ...current, variants: [...current.variants, { id: crypto.randomUUID(), storage: '', price: '', stock: '1' }] }))}>+ Add storage</button></div>
+                {legacyStorageWarning && new Set(form.variants.map(variant => variant.storage.trim().toLowerCase())).size !== form.variants.length && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-xs text-amber-900">This listing has more than one old color option for the same storage size. Combine their quantities into one row and set one price per storage size before saving.</p>}
+                {form.variants.map((variant, index) => <div key={variant.id} className="mt-3 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-[1fr_1fr_80px_auto]">
+                  {(['storage', 'price', 'stock'] as const).map(field => <label key={field} className="text-xs font-semibold capitalize text-slate-700">{field === 'price' ? 'Price (₦)' : field}<input className={`${INPUT_CLASS} mt-1`} type={field === 'price' || field === 'stock' ? 'number' : 'text'} min={field === 'price' ? '1' : field === 'stock' ? '0' : undefined} step={field === 'stock' ? '1' : undefined} value={variant[field]} onChange={event => setForm(current => ({ ...current, variants: current.variants.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: event.target.value } : row) }))} placeholder={field === 'storage' ? '256GB' : undefined} /></label>)}
                   <button type="button" className="self-end rounded-lg px-2 py-2.5 text-xs font-semibold text-red-700 hover:bg-red-50" onClick={() => setForm(current => ({ ...current, variants: current.variants.filter(row => row.id !== variant.id) }))}>Remove</button>
                 </div>)}
               </div>}
@@ -515,7 +520,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
                 {saleProduct.image && <img src={saleProduct.image} alt="" className="h-16 w-16 rounded-lg bg-white object-cover" />}
                 <div className="min-w-0"><strong className="block text-sm text-slate-900">{saleProduct.name}</strong><span className="mt-1 block text-xs text-slate-600">{saleProduct.brand} · {saleProduct.category} · {saleProduct.condition}</span><span className="mt-1 block text-xs text-slate-600">{saleProduct.listingGroup === 'goodies' ? 'Goodies' : 'Devices'} · {saleProduct.stock ?? 0} currently in stock</span><span className="mt-1 block text-sm font-semibold text-blue-900">Listed at ₦{saleProduct.price.toLocaleString('en-NG')}</span></div>
               </div>
-              {saleProduct.variants && saleProduct.variants.length > 0 && <label className="block text-sm font-semibold text-slate-700">Color and storage sold<select className={`${INPUT_CLASS} mt-1.5`} value={saleVariantId} onChange={event => { const variant = saleProduct.variants?.find(option => option.id === event.target.value); setSaleVariantId(event.target.value); if (variant) setSalePrice(String(variant.price)); }} required>{saleProduct.variants.filter(variant => variant.stock > 0).map(variant => <option key={variant.id} value={variant.id}>{variant.color} · {variant.storage} · {variant.stock} available</option>)}</select></label>}
+              {saleProduct.variants && saleProduct.variants.length > 0 && <label className="block text-sm font-semibold text-slate-700">Storage sold<select className={`${INPUT_CLASS} mt-1.5`} value={saleVariantId} onChange={event => { const variant = saleProduct.variants?.find(option => option.id === event.target.value); setSaleVariantId(event.target.value); if (variant) setSalePrice(String(variant.price)); }} required>{saleProduct.variants.filter(variant => variant.stock > 0).map(variant => <option key={variant.id} value={variant.id}>{variant.storage} · ₦{variant.price.toLocaleString('en-NG')} · {variant.stock} available</option>)}</select></label>}
               <label className="block text-sm font-semibold text-slate-700">IMEI or serial number
                 <input className={`${INPUT_CLASS} mt-1.5`} value={saleSerialNumber} onChange={event => setSaleSerialNumber(event.target.value)} placeholder="Enter the identifier for this unit" autoComplete="off" required={!saleHasNoIdentifier} disabled={saleHasNoIdentifier} />
               </label>

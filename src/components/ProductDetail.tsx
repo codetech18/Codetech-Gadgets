@@ -17,7 +17,6 @@ function whatsappLink(product: Product) {
   const message = [
     `Hi CodeTech Gadgets, I’m interested in buying this device: ${product.name}.`,
     `Listed price: ${money(product.price)}`,
-    selected ? `Color: ${selected.color}` : '',
     selected ? `Storage: ${selected.storage}` : '',
     `Condition: ${product.condition || 'Please confirm condition'}`,
     product.conditionNotes ? `Condition details: ${product.conditionNotes}` : '',
@@ -33,10 +32,14 @@ export default function ProductDetail({ product, onBack, onSwap, onAddToCart }: 
   useEffect(() => setActiveImageIndex(0), [product.id]);
   useEffect(() => setSelectedVariantId(product.variants?.find(variant => variant.stock > 0)?.id ?? ''), [product.id, product.variants]);
   const availableVariants = product.variants?.filter(variant => variant.stock > 0) ?? [];
-  const selectedVariant = availableVariants.find(variant => variant.id === selectedVariantId) ?? availableVariants[0];
+  const storageOptions = availableVariants.reduce<typeof availableVariants>((options, variant) => {
+    const existing = options.find(option => option.storage.toLowerCase() === variant.storage.toLowerCase());
+    if (!existing) options.push(variant);
+    else if (variant.price < existing.price) options[options.indexOf(existing)] = variant;
+    return options;
+  }, []);
+  const selectedVariant = storageOptions.find(variant => variant.id === selectedVariantId) ?? storageOptions[0];
   const selectedProduct = selectedVariant ? { ...product, price: selectedVariant.price, stock: selectedVariant.stock, selectedVariantId: selectedVariant.id } : product;
-  const colors = [...new Set(availableVariants.map(variant => variant.color))];
-  const storages = [...new Set(availableVariants.filter(variant => variant.color === selectedVariant?.color).map(variant => variant.storage))];
   const activeImage = images[activeImageIndex] ?? images[0];
 
   return (
@@ -63,8 +66,7 @@ export default function ProductDetail({ product, onBack, onSwap, onAddToCart }: 
             <p className="product-detail-price">{money(selectedProduct.price)}</p>
             <div className="product-availability"><span /> {product.backInStock ? 'Back in stock · Available now' : 'Available to enquire about'}</div>
             {availableVariants.length > 0 && <div className="product-variant-picker">
-              <fieldset><legend>Color</legend><div className="product-variant-options">{colors.map(color => <button key={color} type="button" aria-pressed={selectedVariant?.color === color} onClick={() => setSelectedVariantId(availableVariants.find(variant => variant.color === color)?.id ?? '')}>{color}</button>)}</div></fieldset>
-              <fieldset><legend>Storage</legend><div className="product-variant-options">{storages.map(storage => <button key={storage} type="button" aria-pressed={selectedVariant?.storage === storage} onClick={() => setSelectedVariantId(availableVariants.find(variant => variant.color === selectedVariant?.color && variant.storage === storage)?.id ?? '')}>{storage}</button>)}</div></fieldset>
+              <fieldset><legend>Storage</legend><div className="product-variant-options">{storageOptions.map(option => <button key={option.id} type="button" aria-pressed={selectedVariant?.storage.toLowerCase() === option.storage.toLowerCase()} onClick={() => setSelectedVariantId(option.id)}>{option.storage}</button>)}</div></fieldset>
             </div>}
 
             <div className="product-detail-rule" />

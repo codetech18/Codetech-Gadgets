@@ -145,7 +145,7 @@ export default function App() {
   function checkout(promoDiscount: number) {
     void promoDiscount;
     if (!cart.length) return;
-    const items = cart.map(item => { const variant = item.variants?.find(option => option.id === item.selectedVariantId); return `• ${item.name}${variant ? ` (${variant.color}, ${variant.storage})` : ''} × ${item.qty} — ₦${(item.price * item.qty).toLocaleString('en-NG')}`; }).join('\n');
+    const items = cart.map(item => { const variant = item.variants?.find(option => option.id === item.selectedVariantId); return `• ${item.name}${variant ? ` (${variant.storage})` : ''} × ${item.qty} — ₦${(item.price * item.qty).toLocaleString('en-NG')}`; }).join('\n');
     const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
     const message = `Hi CodeTech Gadgets, I’d like to check availability and arrange a purchase:\n\n${items}\n\nEstimated item total: ₦${total.toLocaleString('en-NG')}\nPlease confirm availability, delivery, and payment details.`;
     window.location.assign(`https://wa.me/2349058977101?text=${encodeURIComponent(message)}`);
