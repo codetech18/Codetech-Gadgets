@@ -2,6 +2,14 @@ export type Page = 'home' | 'devices' | 'goodies' | 'product' | 'cart' | 'login'
 
 export type BadgeType = string | null;
 
+export interface ProductVariant {
+  id: string;
+  color: string;
+  storage: string;
+  price: number;
+  stock: number;
+}
+
 export interface Product {
   id: string | number;
   name: string;
@@ -21,6 +29,8 @@ export interface Product {
   stock?: number;
   listingStatus?: 'available' | 'out_of_stock' | 'sold';
   backInStock?: boolean;
+  variants?: ProductVariant[];
+  selectedVariantId?: string;
 }
 
 export interface SaleRecord {
@@ -36,6 +46,9 @@ export interface SaleRecord {
   image?: string;
   quantity: number;
   soldPrice: number;
+  variantId?: string;
+  variantColor?: string;
+  variantStorage?: string;
   saleChannel: 'whatsapp';
   soldAt: string;
   reversedAt?: string;
@@ -45,6 +58,7 @@ export interface SaleRecord {
 
 export interface CartItem extends Product {
   qty: number;
+  cartId: string;
 }
 
 export interface OrderItem {

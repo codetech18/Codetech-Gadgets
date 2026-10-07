@@ -1,5 +1,5 @@
 import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
-import { Product } from '../types';
+import { Product, ProductVariant } from '../types';
 import { getDatabase } from './firebase';
 
 type CatalogRecord = {
@@ -24,6 +24,7 @@ type CatalogRecord = {
   oldPriceNgn?: number | string;
   status?: 'available' | 'out_of_stock' | 'sold';
   backInStock?: boolean;
+  variants?: ProductVariant[];
   createdAt?: { toMillis?: () => number };
 };
 
@@ -53,6 +54,7 @@ function toProduct(id: string, record: CatalogRecord): Product | null {
       stock,
       listingStatus: record.status ?? (stock > 0 ? 'available' : 'out_of_stock'),
       backInStock: Boolean(record.backInStock),
+      variants: Array.isArray(record.variants) ? record.variants.filter(variant => variant && typeof variant.id === 'string' && Number.isFinite(Number(variant.price)) && Number.isFinite(Number(variant.stock))).map(variant => ({ id: variant.id, color: String(variant.color ?? ''), storage: String(variant.storage ?? ''), price: Number(variant.price), stock: Number(variant.stock) })) : [],
     };
     const oldPrice = Number(record.oldPriceNgn ?? 0);
     if (oldPrice > 0) product.oldPrice = oldPrice;

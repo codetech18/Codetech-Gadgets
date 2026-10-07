@@ -38,19 +38,20 @@ export default function Cart({ cart, onChangeQty, onRemove, onClear, onCheckout,
                 </button>
               </div>
             ) : cart.map(item => (
-              <div key={item.id} className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 border-b border-slate-100 last:border-none hover:bg-slate-50 transition-colors">
+              <div key={item.cartId} className="flex items-center gap-3 sm:gap-4 px-4 sm:px-5 py-4 border-b border-slate-100 last:border-none hover:bg-slate-50 transition-colors">
                 <div className="w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0">{item.image ? <img src={item.image} alt="" className="h-full w-full object-cover" /> : <span className="text-xl">{item.emoji}</span>}</div>
                 <div className="flex-1 min-w-0">
                   <div className="text-xs uppercase tracking-widest text-blue-400 font-bold mb-0.5">{item.brand}</div>
                   <div className="font-['Manrope'] font-bold text-blue-950 text-sm sm:text-base truncate">{item.name}</div>
+                  {item.selectedVariantId && <div className="text-xs text-slate-500">{(() => { const variant = item.variants?.find(option => option.id === item.selectedVariantId); return variant ? `${variant.color} · ${variant.storage}` : ''; })()}</div>}
                   <div className="text-blue-600 font-bold text-sm mt-0.5">₦{(item.price * item.qty).toLocaleString()}</div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <button onClick={() => onChangeQty(item.id, -1)} className="w-7 h-7 rounded-lg border border-slate-200 bg-white text-blue-600 font-bold flex items-center justify-center hover:bg-blue-50 hover:border-blue-400 transition-all">−</button>
+                  <button onClick={() => onChangeQty(item.cartId, -1)} className="w-7 h-7 rounded-lg border border-slate-200 bg-white text-blue-600 font-bold flex items-center justify-center hover:bg-blue-50 hover:border-blue-400 transition-all">−</button>
                   <span className="font-['Manrope'] font-bold text-blue-950 w-5 text-center text-sm">{item.qty}</span>
-                  <button onClick={() => onChangeQty(item.id, 1)} className="w-7 h-7 rounded-lg border border-slate-200 bg-white text-blue-600 font-bold flex items-center justify-center hover:bg-blue-50 hover:border-blue-400 transition-all">+</button>
+                  <button onClick={() => onChangeQty(item.cartId, 1)} className="w-7 h-7 rounded-lg border border-slate-200 bg-white text-blue-600 font-bold flex items-center justify-center hover:bg-blue-50 hover:border-blue-400 transition-all">+</button>
                 </div>
-                <button onClick={() => onRemove(item.id)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-all flex-shrink-0 text-sm">✕</button>
+                <button onClick={() => onRemove(item.cartId)} className="text-slate-300 hover:text-red-500 hover:bg-red-50 p-1.5 rounded-lg transition-all flex-shrink-0 text-sm">✕</button>
               </div>
             ))}
           </div>

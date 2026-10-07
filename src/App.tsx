@@ -108,31 +108,32 @@ export default function App() {
 
   // ── Cart ──
   function addToCart(product: Product) {
-    const existing = cart.find(item => item.id === product.id);
+    const cartId = `${product.id}::${product.selectedVariantId ?? ''}`;
+    const existing = cart.find(item => item.cartId === cartId);
     if (existing && product.stock && existing.qty >= product.stock) {
       showToast('This listing is for one specific device.');
       return;
     }
     setCart(prev => {
-      const existing = prev.find(x => x.id === product.id);
-      if (existing) return prev.map(x => x.id === product.id ? { ...x, qty: x.qty + 1 } : x);
-      return [...prev, { ...product, qty: 1 }];
+      const existing = prev.find(x => x.cartId === cartId);
+      if (existing) return prev.map(x => x.cartId === cartId ? { ...x, qty: x.qty + 1 } : x);
+      return [...prev, { ...product, cartId, qty: 1 }];
     });
     showToast(`${product.name} added to your bag`);
   }
 
   const changeQty = useCallback((id: Product['id'], delta: number) => {
     setCart(prev => {
-      const item = prev.find(x => x.id === id);
+      const item = prev.find(x => x.cartId === id);
       if (!item) return prev;
-      if (item.qty + delta <= 0) return prev.filter(x => x.id !== id);
+      if (item.qty + delta <= 0) return prev.filter(x => x.cartId !== id);
       if (delta > 0 && item.stock && item.qty >= item.stock) return prev;
-      return prev.map(x => x.id === id ? { ...x, qty: x.qty + delta } : x);
+      return prev.map(x => x.cartId === id ? { ...x, qty: x.qty + delta } : x);
     });
   }, []);
 
   const removeFromCart = useCallback((id: Product['id']) => {
-    setCart(prev => prev.filter(x => x.id !== id));
+    setCart(prev => prev.filter(x => x.cartId !== id));
     showToast('Item removed from cart');
   }, []);
 
@@ -144,7 +145,7 @@ export default function App() {
   function checkout(promoDiscount: number) {
     void promoDiscount;
     if (!cart.length) return;
-    const items = cart.map(item => `• ${item.name} × ${item.qty} — ₦${(item.price * item.qty).toLocaleString('en-NG')}`).join('\n');
+    const items = cart.map(item => { const variant = item.variants?.find(option => option.id === item.selectedVariantId); return `• ${item.name}${variant ? ` (${variant.color}, ${variant.storage})` : ''} × ${item.qty} — ₦${(item.price * item.qty).toLocaleString('en-NG')}`; }).join('\n');
     const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
     const message = `Hi CodeTech Gadgets, I’d like to check availability and arrange a purchase:\n\n${items}\n\nEstimated item total: ₦${total.toLocaleString('en-NG')}\nPlease confirm availability, delivery, and payment details.`;
     window.location.assign(`https://wa.me/2349058977101?text=${encodeURIComponent(message)}`);
@@ -168,10 +169,10 @@ export default function App() {
     setCatalogStatus('live');
     showToast('Product updated.');
   }
-  async function markProductSold(id: Product['id'], soldPrice: number, serialNumber: string | null) {
+  async function markProductSold(id: Product['id'], soldPrice: number, serialNumber: string | null, variantId?: string) {
     if (typeof id !== 'string') throw new Error('This sample item is not saved in Firestore yet.');
     const { markInventoryProductSold } = await import('./lib/firestoreInventory');
-    await markInventoryProductSold(id, soldPrice, serialNumber);
+    await markInventoryProductSold(id, soldPrice, serialNumber, variantId);
     const { loadFirestoreCatalog } = await import('./lib/firestoreCatalog');
     setProducts(await loadFirestoreCatalog());
     setCatalogStatus('live');

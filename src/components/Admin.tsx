@@ -1,13 +1,13 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut, User as FirebaseUser } from 'firebase/auth';
-import { Product, SaleRecord } from '../types';
+import { Product, ProductVariant, SaleRecord } from '../types';
 import { getFirebaseAuth } from '../lib/firebase';
 import { displayImageUrl } from '../lib/displayImageUrl';
 
 interface AdminProps {
   onAddProduct: (product: Omit<Product, 'id'>) => Promise<void>;
   onEditProduct: (id: Product['id'], product: Omit<Product, 'id'>) => Promise<void>;
-  onMarkSold: (id: Product['id'], soldPrice: number, serialNumber: string | null) => Promise<void>;
+  onMarkSold: (id: Product['id'], soldPrice: number, serialNumber: string | null, variantId?: string) => Promise<void>;
   onReverseSale: (saleId: string, reason: string) => Promise<void>;
   onBack: () => void;
 }
@@ -25,12 +25,13 @@ type ProductForm = {
   images: string[];
   imageUrlDraft: string;
   listingGroup: 'devices' | 'goodies';
+  variants: Array<{ id: string; color: string; storage: string; price: string; stock: string }>;
 };
 
 type InventoryFilter = 'all' | 'devices' | 'goodies' | 'low-stock';
 
 const EMPTY_FORM: ProductForm = {
-  name: '', brand: '', price: '', oldPrice: '', category: '', condition: '', conditionNotes: '', stock: '1', badge: '', images: [], imageUrlDraft: '', listingGroup: 'devices',
+  name: '', brand: '', price: '', oldPrice: '', category: '', condition: '', conditionNotes: '', stock: '1', badge: '', images: [], imageUrlDraft: '', listingGroup: 'devices', variants: [],
 };
 const ADMIN_EMAIL = (import.meta.env.VITE_FIREBASE_ADMIN_EMAIL || '').trim().toLowerCase();
 const INPUT_CLASS = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
@@ -58,6 +59,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
   const [search, setSearch] = useState('');
   const [saleProduct, setSaleProduct] = useState<Product | null>(null);
   const [salePrice, setSalePrice] = useState('');
+  const [saleVariantId, setSaleVariantId] = useState('');
   const [saleSerialNumber, setSaleSerialNumber] = useState('');
   const [saleHasNoIdentifier, setSaleHasNoIdentifier] = useState(false);
   const [saleError, setSaleError] = useState('');
@@ -180,6 +182,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
       images: product.images?.length ? [...product.images] : product.image ? [product.image] : [],
       imageUrlDraft: '',
       listingGroup: product.listingGroup || 'devices',
+      variants: (product.variants ?? []).map(variant => ({ ...variant, price: String(variant.price), stock: String(variant.stock) })),
     });
     setFormError('');
     setModalOpen(true);
@@ -231,8 +234,16 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
 
   async function saveProduct(event: FormEvent) {
     event.preventDefault();
-    const price = Number(form.price);
-    const stock = Number(form.stock);
+    const hasVariants = form.variants.length > 0;
+    const variants: ProductVariant[] = form.variants.map(variant => ({ id: variant.id, color: variant.color.trim(), storage: variant.storage.trim(), price: Number(variant.price), stock: Number(variant.stock) }));
+    const availableVariants = variants.filter(variant => variant.stock > 0);
+    const price = hasVariants ? Math.min(...(availableVariants.length ? availableVariants : variants).map(variant => variant.price)) : Number(form.price);
+    const stock = hasVariants ? variants.reduce((sum, variant) => sum + variant.stock, 0) : Number(form.stock);
+    const duplicateVariants = new Set(variants.map(variant => `${variant.color.toLowerCase()}|${variant.storage.toLowerCase()}`)).size !== variants.length;
+    if (hasVariants && (duplicateVariants || variants.some((variant, index) => !variant.color || !variant.storage || !form.variants[index].stock.trim() || !Number.isFinite(variant.price) || variant.price <= 0 || !Number.isInteger(variant.stock) || variant.stock < 0))) {
+      setFormError('Each color and storage combination needs a unique name, a price above zero, and a valid stock quantity.');
+      return;
+    }
     if (!form.name.trim() || !form.brand.trim() || !form.category || !form.condition || (form.listingGroup === 'goodies' && !form.conditionNotes.trim()) || !form.images.length || !Number.isFinite(price) || price <= 0 || !Number.isInteger(stock) || stock < 0) {
       setFormError('Add a name, brand, category, condition, valid price and stock quantity, and at least one product photo.');
       return;
@@ -246,6 +257,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
       condition: form.condition,
       conditionNotes: form.conditionNotes.trim(),
       stock,
+      variants,
       image: form.images[0],
       images: form.images,
       listingGroup: form.listingGroup,
@@ -270,7 +282,9 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
 
   function openSaleRecord(product: Product) {
     setSaleProduct(product);
-    setSalePrice(String(product.price));
+    const firstVariant = product.variants?.find(variant => variant.stock > 0);
+    setSaleVariantId(firstVariant?.id ?? '');
+    setSalePrice(String(firstVariant?.price ?? product.price));
     setSaleSerialNumber('');
     setSaleHasNoIdentifier(false);
     setSaleError('');
@@ -292,7 +306,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
     setSaleBusy(true);
     setSaleError('');
     try {
-      await onMarkSold(saleProduct.id, price, serialNumber);
+      await onMarkSold(saleProduct.id, price, serialNumber, saleVariantId || undefined);
       await refreshInventory();
       await refreshSales();
       setSaleProduct(null);
@@ -443,13 +457,20 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
             <div className="grid gap-4 px-6 py-5 sm:grid-cols-2">
               <label className="text-sm font-semibold text-slate-700">Device name *<input className={`${INPUT_CLASS} mt-1.5`} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} placeholder="iPhone 15 Pro" /></label>
               <label className="text-sm font-semibold text-slate-700">Brand *<input className={`${INPUT_CLASS} mt-1.5`} value={form.brand} onChange={event => setForm({ ...form, brand: event.target.value })} placeholder="Apple" /></label>
-              <label className="text-sm font-semibold text-slate-700">Price (₦) *<input className={`${INPUT_CLASS} mt-1.5`} type="number" min="1" value={form.price} onChange={event => setForm({ ...form, price: event.target.value })} placeholder="850000" /></label>
+              {form.variants.length === 0 && <label className="text-sm font-semibold text-slate-700">Price (₦) *<input className={`${INPUT_CLASS} mt-1.5`} type="number" min="1" value={form.price} onChange={event => setForm({ ...form, price: event.target.value })} placeholder="850000" /></label>}
               <label className="text-sm font-semibold text-slate-700">Previous price (₦)<input className={`${INPUT_CLASS} mt-1.5`} type="number" min="0" value={form.oldPrice} onChange={event => setForm({ ...form, oldPrice: event.target.value })} placeholder="Optional" /></label>
               <label className="text-sm font-semibold text-slate-700">Category *<select className={`${INPUT_CLASS} mt-1.5`} value={form.category} onChange={event => setForm({ ...form, category: event.target.value })}><option value="">Select</option>{['phones', 'laptops', 'tablets', 'audio', 'wearables', 'cameras', 'accessories', 'smart-home'].map(category => <option key={category} value={category}>{category}</option>)}</select></label>
-              <label className="text-sm font-semibold text-slate-700">Catalogue section *<select className={`${INPUT_CLASS} mt-1.5`} value={form.listingGroup} onChange={event => setForm({ ...form, listingGroup: event.target.value as ProductForm['listingGroup'], condition: '', conditionNotes: '' })}><option value="devices">Devices · UK-used & brand-new</option><option value="goodies">Goodies · special deals</option></select></label>
+              <label className="text-sm font-semibold text-slate-700">Catalogue section *<select className={`${INPUT_CLASS} mt-1.5`} value={form.listingGroup} onChange={event => setForm({ ...form, listingGroup: event.target.value as ProductForm['listingGroup'], condition: '', conditionNotes: '', variants: event.target.value === 'goodies' ? [] : form.variants })}><option value="devices">Devices · UK-used & brand-new</option><option value="goodies">Goodies · special deals</option></select></label>
               {form.listingGroup === 'devices' ? <label className="text-sm font-semibold text-slate-700">Stock type *<select className={`${INPUT_CLASS} mt-1.5`} value={form.condition} onChange={event => setForm({ ...form, condition: event.target.value })}><option value="">Select</option><option value="UK Used">UK Used</option><option value="Brand New">Brand New</option></select></label> : <label className="text-sm font-semibold text-slate-700">Condition *<input className={`${INPUT_CLASS} mt-1.5`} value={form.condition} onChange={event => setForm({ ...form, condition: event.target.value })} placeholder="e.g. Goodie · minor screen issue" /></label>}
               {form.listingGroup === 'goodies' && <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Condition details customers should know *<textarea className={`${INPUT_CLASS} mt-1.5 min-h-20 resize-y`} value={form.conditionNotes} onChange={event => setForm({ ...form, conditionNotes: event.target.value })} placeholder="Describe any faults, wear, or included accessories clearly." /></label>}
-              <label className="text-sm font-semibold text-slate-700">Quantity in stock *<input className={`${INPUT_CLASS} mt-1.5`} type="number" min="0" step="1" value={form.stock} onChange={event => setForm({ ...form, stock: event.target.value })} /></label>
+              {form.variants.length === 0 && <label className="text-sm font-semibold text-slate-700">Quantity in stock *<input className={`${INPUT_CLASS} mt-1.5`} type="number" min="0" step="1" value={form.stock} onChange={event => setForm({ ...form, stock: event.target.value })} /></label>}
+              {form.listingGroup === 'devices' && <div className="sm:col-span-2 rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+                <div className="flex items-start justify-between gap-3"><div><strong className="text-sm text-blue-950">Colors and storage</strong><p className="mt-1 text-xs text-slate-600">Add one row for every combination you sell. Each row has its own price and quantity.</p></div><button type="button" className="shrink-0 rounded-lg bg-blue-700 px-3 py-2 text-xs font-bold text-white" onClick={() => setForm(current => ({ ...current, variants: [...current.variants, { id: crypto.randomUUID(), color: '', storage: '', price: '', stock: '1' }] }))}>+ Add option</button></div>
+                {form.variants.map((variant, index) => <div key={variant.id} className="mt-3 grid gap-2 rounded-lg border border-slate-200 bg-white p-3 sm:grid-cols-[1fr_1fr_1fr_80px_auto]">
+                  {(['color', 'storage', 'price', 'stock'] as const).map(field => <label key={field} className="text-xs font-semibold capitalize text-slate-700">{field === 'price' ? 'Price (₦)' : field}<input className={`${INPUT_CLASS} mt-1`} type={field === 'price' || field === 'stock' ? 'number' : 'text'} min={field === 'price' ? '1' : field === 'stock' ? '0' : undefined} step={field === 'stock' ? '1' : undefined} value={variant[field]} onChange={event => setForm(current => ({ ...current, variants: current.variants.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: event.target.value } : row) }))} placeholder={field === 'color' ? 'Black' : field === 'storage' ? '256GB' : undefined} /></label>)}
+                  <button type="button" className="self-end rounded-lg px-2 py-2.5 text-xs font-semibold text-red-700 hover:bg-red-50" onClick={() => setForm(current => ({ ...current, variants: current.variants.filter(row => row.id !== variant.id) }))}>Remove</button>
+                </div>)}
+              </div>}
               <label className="text-sm font-semibold text-slate-700">Store badge<select className={`${INPUT_CLASS} mt-1.5`} value={form.badge} onChange={event => setForm({ ...form, badge: event.target.value })}><option value="">No badge</option><option value="New arrival">New arrival</option><option value="Popular">Popular</option><option value="Good value">Good value</option></select></label>
               <div className="sm:col-span-2">
                 <div className="flex items-center justify-between gap-3">
@@ -494,6 +515,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
                 {saleProduct.image && <img src={saleProduct.image} alt="" className="h-16 w-16 rounded-lg bg-white object-cover" />}
                 <div className="min-w-0"><strong className="block text-sm text-slate-900">{saleProduct.name}</strong><span className="mt-1 block text-xs text-slate-600">{saleProduct.brand} · {saleProduct.category} · {saleProduct.condition}</span><span className="mt-1 block text-xs text-slate-600">{saleProduct.listingGroup === 'goodies' ? 'Goodies' : 'Devices'} · {saleProduct.stock ?? 0} currently in stock</span><span className="mt-1 block text-sm font-semibold text-blue-900">Listed at ₦{saleProduct.price.toLocaleString('en-NG')}</span></div>
               </div>
+              {saleProduct.variants && saleProduct.variants.length > 0 && <label className="block text-sm font-semibold text-slate-700">Color and storage sold<select className={`${INPUT_CLASS} mt-1.5`} value={saleVariantId} onChange={event => { const variant = saleProduct.variants?.find(option => option.id === event.target.value); setSaleVariantId(event.target.value); if (variant) setSalePrice(String(variant.price)); }} required>{saleProduct.variants.filter(variant => variant.stock > 0).map(variant => <option key={variant.id} value={variant.id}>{variant.color} · {variant.storage} · {variant.stock} available</option>)}</select></label>}
               <label className="block text-sm font-semibold text-slate-700">IMEI or serial number
                 <input className={`${INPUT_CLASS} mt-1.5`} value={saleSerialNumber} onChange={event => setSaleSerialNumber(event.target.value)} placeholder="Enter the identifier for this unit" autoComplete="off" required={!saleHasNoIdentifier} disabled={saleHasNoIdentifier} />
               </label>

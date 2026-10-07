@@ -187,6 +187,12 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .product-detail-copy > .eyebrow { color: #566780; }
 .product-detail-copy h1 { max-width: 620px; margin: 7px 0 0; color: #142443; font: 750 clamp(32px,4vw,52px)/1.08 Manrope,sans-serif; letter-spacing: -.055em; }
 .product-detail-price { margin: 20px 0 10px; color: #1e4196; font: 800 25px Manrope,sans-serif; }
+.product-variant-picker { display: grid; gap: 15px; margin-top: 22px; }
+.product-variant-picker fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.product-variant-picker legend { margin-bottom: 9px; color: #263650; font: 700 13px Manrope,sans-serif; }
+.product-variant-options { display: flex; flex-wrap: wrap; gap: 8px; }
+.product-variant-options button { border: 1px solid #dce2eb; background: #fff; color: #263650; padding: 9px 14px; cursor: pointer; font: 700 13px Manrope,sans-serif; }
+.product-variant-options button[aria-pressed="true"] { border-color: #29499f; background: #edf2ff; color: #1e4196; }
 .product-availability { display: flex; align-items: center; gap: 8px; color: #617084; font-size: 13px; }
 .product-availability > span { width: 7px; height: 7px; border-radius: 50%; background: #23865d; }
 .product-detail-rule { height: 1px; margin: 25px 0 21px; background: #e7ebf0; }

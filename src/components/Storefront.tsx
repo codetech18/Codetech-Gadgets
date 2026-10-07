@@ -52,7 +52,7 @@ function DeviceCard({ product, onOpen }: { product: Product; onOpen: () => void 
         <div className="device-meta"><span>{product.brand}</span>{product.listingGroup === 'goodies' && product.condition && <span>{product.condition}</span>}</div>
         <h3>{product.name}</h3>
         {product.listingGroup === 'goodies' && product.conditionNotes && <p className="device-condition-note">{product.conditionNotes}</p>}
-        <div className="device-price-line"><strong>{money(product.price)}</strong></div>
+        <div className="device-price-line"><strong>{product.variants && product.variants.filter(variant => variant.stock > 0).length > 1 ? 'From ' : ''}{money(product.price)}</strong></div>
       </div>
     </button>
   );

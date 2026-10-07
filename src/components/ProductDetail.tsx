@@ -13,9 +13,12 @@ interface ProductDetailProps {
 }
 
 function whatsappLink(product: Product) {
+  const selected = product.variants?.find(variant => variant.id === product.selectedVariantId);
   const message = [
     `Hi CodeTech Gadgets, I’m interested in buying this device: ${product.name}.`,
     `Listed price: ${money(product.price)}`,
+    selected ? `Color: ${selected.color}` : '',
+    selected ? `Storage: ${selected.storage}` : '',
     `Condition: ${product.condition || 'Please confirm condition'}`,
     product.conditionNotes ? `Condition details: ${product.conditionNotes}` : '',
     'Please confirm current availability, delivery options, and how I can pay. I understand this is an enquiry and my order is only confirmed after your team replies.',
@@ -26,7 +29,14 @@ function whatsappLink(product: Product) {
 export default function ProductDetail({ product, onBack, onSwap, onAddToCart }: ProductDetailProps) {
   const images = product.images?.length ? product.images : product.image ? [product.image] : [];
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [selectedVariantId, setSelectedVariantId] = useState('');
   useEffect(() => setActiveImageIndex(0), [product.id]);
+  useEffect(() => setSelectedVariantId(product.variants?.find(variant => variant.stock > 0)?.id ?? ''), [product.id, product.variants]);
+  const availableVariants = product.variants?.filter(variant => variant.stock > 0) ?? [];
+  const selectedVariant = availableVariants.find(variant => variant.id === selectedVariantId) ?? availableVariants[0];
+  const selectedProduct = selectedVariant ? { ...product, price: selectedVariant.price, stock: selectedVariant.stock, selectedVariantId: selectedVariant.id } : product;
+  const colors = [...new Set(availableVariants.map(variant => variant.color))];
+  const storages = [...new Set(availableVariants.filter(variant => variant.color === selectedVariant?.color).map(variant => variant.storage))];
   const activeImage = images[activeImageIndex] ?? images[0];
 
   return (
@@ -50,8 +60,12 @@ export default function ProductDetail({ product, onBack, onSwap, onAddToCart }: 
           <section className="product-detail-copy" aria-labelledby="product-title">
             <p className="eyebrow">{product.brand} <span aria-hidden="true">·</span> {product.condition || 'Condition details available'}</p>
             <h1 id="product-title">{product.name}</h1>
-            <p className="product-detail-price">{money(product.price)}</p>
+            <p className="product-detail-price">{money(selectedProduct.price)}</p>
             <div className="product-availability"><span /> {product.backInStock ? 'Back in stock · Available now' : 'Available to enquire about'}</div>
+            {availableVariants.length > 0 && <div className="product-variant-picker">
+              <fieldset><legend>Color</legend><div className="product-variant-options">{colors.map(color => <button key={color} type="button" aria-pressed={selectedVariant?.color === color} onClick={() => setSelectedVariantId(availableVariants.find(variant => variant.color === color)?.id ?? '')}>{color}</button>)}</div></fieldset>
+              <fieldset><legend>Storage</legend><div className="product-variant-options">{storages.map(storage => <button key={storage} type="button" aria-pressed={selectedVariant?.storage === storage} onClick={() => setSelectedVariantId(availableVariants.find(variant => variant.color === selectedVariant?.color && variant.storage === storage)?.id ?? '')}>{storage}</button>)}</div></fieldset>
+            </div>}
 
             <div className="product-detail-rule" />
             <h2>Device details</h2>
@@ -64,8 +78,8 @@ export default function ProductDetail({ product, onBack, onSwap, onAddToCart }: 
             <p className="product-order-note">Send an enquiry and our team will confirm that this device is still available, explain delivery options, and share payment instructions. Your order is not placed until we confirm it with you.</p>
 
             <div className="product-actions">
-              <a className="product-whatsapp-button" href={whatsappLink(product)} target="_blank" rel="noreferrer">Ask to buy on WhatsApp <span aria-hidden="true">↗</span></a>
-              <button className="product-list-button" onClick={() => onAddToCart(product)}>Add to purchase list <span aria-hidden="true">＋</span></button>
+              <a className="product-whatsapp-button" href={whatsappLink(selectedProduct)} target="_blank" rel="noreferrer">Ask to buy on WhatsApp <span aria-hidden="true">↗</span></a>
+              <button className="product-list-button" onClick={() => onAddToCart(selectedProduct)}>Add to purchase list <span aria-hidden="true">＋</span></button>
               <button className="product-swap-button" onClick={() => onSwap(product)}>Use this device in a swap <span aria-hidden="true">→</span></button>
             </div>
           </section>
