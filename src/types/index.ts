@@ -26,7 +26,7 @@ export interface Product {
   conditionNotes?: string;
   listingGroup?: 'devices' | 'goodies';
   stock?: number;
-  listingStatus?: 'available' | 'out_of_stock' | 'sold';
+  listingStatus?: 'available' | 'out_of_stock' | 'sold' | 'deleted';
   backInStock?: boolean;
   variants?: ProductVariant[];
   selectedVariantId?: string;

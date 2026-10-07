@@ -11,6 +11,7 @@ import TradeRequest from './components/TradeRequest';
 import ProductDetail from './components/ProductDetail';
 import StoreFooter from './components/StoreFooter';
 import { unlistedItemEnquiryLink } from './lib/unlistedItemEnquiry';
+import type { CatalogCursor } from './lib/firestoreCatalog';
 
 const Admin = lazy(() => import('./components/Admin'));
 
@@ -36,6 +37,14 @@ export default function App() {
   const [swapTargetName, setSwapTargetName] = useState('');
   const [products, setProducts] = useState<Product[]>(() => hasFirebaseConfig ? [] : INITIAL_PRODUCTS);
   const [catalogStatus, setCatalogStatus] = useState<'preview' | 'loading' | 'live' | 'error'>(hasFirebaseConfig ? 'loading' : 'preview');
+  const [catalogHasMore, setCatalogHasMore] = useState(false);
+  const [catalogLoadingMore, setCatalogLoadingMore] = useState(false);
+  const [catalogLoadError, setCatalogLoadError] = useState('');
+  const catalogCursor = useRef<CatalogCursor | null>(null);
+  const catalogLoadBusy = useRef(false);
+  const catalogGeneration = useRef(0);
+  const [lookupProduct, setLookupProduct] = useState<Product | null>(null);
+  const [lookupStatus, setLookupStatus] = useState<'idle' | 'loading' | 'missing'>('idle');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [user, setUser] = useState<User | null>(null);
   const [toast, setToast] = useState({ msg: '', visible: false });
@@ -48,19 +57,65 @@ export default function App() {
     }
   }, []);
 
-  useEffect(() => {
+  const refreshCatalog = useCallback(async () => {
     if (!hasFirebaseConfig) return;
-    let cancelled = false;
-    let unsubscribe: (() => void) | null = null;
-    import('./lib/firestoreCatalog').then(({ subscribeFirestoreCatalog }) => {
-      if (cancelled) return;
-      unsubscribe = subscribeFirestoreCatalog(
-        items => { setProducts(items); setCatalogStatus('live'); },
-        () => { setCatalogStatus('error'); },
-      );
-    }).catch(() => { if (!cancelled) { setProducts([]); setCatalogStatus('error'); } });
-    return () => { cancelled = true; unsubscribe?.(); };
+    const generation = ++catalogGeneration.current;
+    catalogCursor.current = null;
+    setCatalogHasMore(false);
+    setCatalogLoadError('');
+    setCatalogStatus('loading');
+    try {
+      const { loadFirestoreCatalogPage } = await import('./lib/firestoreCatalog');
+      const nextPage = await loadFirestoreCatalogPage();
+      if (generation !== catalogGeneration.current) return;
+      catalogCursor.current = nextPage.cursor;
+      setProducts(nextPage.products);
+      setCatalogHasMore(nextPage.hasMore);
+      setCatalogStatus('live');
+    } catch {
+      if (generation !== catalogGeneration.current) return;
+      setProducts([]);
+      setCatalogStatus('error');
+    }
   }, [hasFirebaseConfig]);
+
+  useEffect(() => { void refreshCatalog(); }, [refreshCatalog]);
+
+  const loadMoreCatalog = useCallback(async () => {
+    if (!hasFirebaseConfig || !catalogHasMore || catalogLoadBusy.current || !catalogCursor.current) return;
+    catalogLoadBusy.current = true;
+    const generation = catalogGeneration.current;
+    setCatalogLoadingMore(true);
+    setCatalogLoadError('');
+    try {
+      const { loadFirestoreCatalogPage } = await import('./lib/firestoreCatalog');
+      const nextPage = await loadFirestoreCatalogPage(catalogCursor.current);
+      if (generation !== catalogGeneration.current) return;
+      catalogCursor.current = nextPage.cursor;
+      setProducts(current => {
+        const known = new Set(current.map(item => String(item.id)));
+        return [...current, ...nextPage.products.filter(item => !known.has(String(item.id)))];
+      });
+      setCatalogHasMore(nextPage.hasMore);
+    } catch {
+      if (generation === catalogGeneration.current) setCatalogLoadError('Could not load more listings. Try again.');
+    } finally {
+      catalogLoadBusy.current = false;
+      if (generation === catalogGeneration.current) setCatalogLoadingMore(false);
+    }
+  }, [hasFirebaseConfig, catalogHasMore]);
+
+  useEffect(() => {
+    if (page !== 'product' || !selectedProductId || products.some(item => String(item.id) === selectedProductId) || !hasFirebaseConfig) return;
+    let cancelled = false;
+    setLookupStatus('loading');
+    void import('./lib/firestoreCatalog').then(({ loadFirestoreProduct }) => loadFirestoreProduct(selectedProductId)).then(product => {
+      if (cancelled) return;
+      setLookupProduct(product);
+      setLookupStatus(product ? 'idle' : 'missing');
+    }).catch(() => { if (!cancelled) setLookupStatus('missing'); });
+    return () => { cancelled = true; };
+  }, [page, selectedProductId, products, hasFirebaseConfig]);
 
   useEffect(() => {
     const restoreRoute = () => {
@@ -160,43 +215,51 @@ export default function App() {
   async function addProduct(data: Omit<Product, 'id'>) {
     const { createInventoryProduct } = await import('./lib/firestoreInventory');
     await createInventoryProduct(data);
-    const { loadFirestoreCatalog } = await import('./lib/firestoreCatalog');
-    setProducts(await loadFirestoreCatalog());
-    setCatalogStatus('live');
+    await refreshCatalog();
     showToast('Product added to the storefront.');
   }
   async function editProduct(id: Product['id'], data: Omit<Product, 'id'>) {
     if (typeof id !== 'string') throw new Error('This sample item is not saved in Firestore yet.');
     const { updateInventoryProduct } = await import('./lib/firestoreInventory');
     await updateInventoryProduct(id, data);
-    const { loadFirestoreCatalog } = await import('./lib/firestoreCatalog');
-    setProducts(await loadFirestoreCatalog());
-    setCatalogStatus('live');
+    await refreshCatalog();
     showToast('Product updated.');
+  }
+  async function deleteProduct(id: Product['id']) {
+    if (typeof id !== 'string') throw new Error('This sample item is not saved in Firestore yet.');
+    const { deleteInventoryProduct } = await import('./lib/firestoreInventory');
+    await deleteInventoryProduct(id);
+    setLookupProduct(previous => String(previous?.id) === id ? null : previous);
+    await refreshCatalog();
+    setCart(previous => previous.filter(item => item.id !== id));
+    showToast('Listing deleted from the storefront.');
+  }
+  async function restoreProduct(id: Product['id']) {
+    if (typeof id !== 'string') throw new Error('This sample item is not saved in Firestore yet.');
+    const { restoreInventoryProduct } = await import('./lib/firestoreInventory');
+    await restoreInventoryProduct(id);
+    await refreshCatalog();
+    showToast('Listing restored.');
   }
   async function markProductSold(id: Product['id'], soldPrice: number, serialNumber: string | null, variantId?: string) {
     if (typeof id !== 'string') throw new Error('This sample item is not saved in Firestore yet.');
     const { markInventoryProductSold } = await import('./lib/firestoreInventory');
     await markInventoryProductSold(id, soldPrice, serialNumber, variantId);
-    const { loadFirestoreCatalog } = await import('./lib/firestoreCatalog');
-    setProducts(await loadFirestoreCatalog());
-    setCatalogStatus('live');
+    await refreshCatalog();
     showToast('Sale recorded. Inventory updated.');
   }
 
   async function reverseSale(saleId: string, reason: string) {
     const { reverseInventorySale } = await import('./lib/firestoreInventory');
     await reverseInventorySale(saleId, reason);
-    const { loadFirestoreCatalog } = await import('./lib/firestoreCatalog');
-    setProducts(await loadFirestoreCatalog());
-    setCatalogStatus('live');
+    await refreshCatalog();
     showToast('Sale reversed. One unit is back in stock and available for resale.');
   }
 
   const cartCount = cart.reduce((s, x) => s + x.qty, 0);
 
   if (page === 'admin') {
-    return <div className="admin-app-root"><Suspense fallback={<div className="admin-loading">Opening CodeTech Admin…</div>}><Admin onAddProduct={addProduct} onEditProduct={editProduct} onMarkSold={markProductSold} onReverseSale={reverseSale} onBack={() => navigate('home')} /></Suspense><Toast message={toast.msg} visible={toast.visible} /></div>;
+    return <div className="admin-app-root"><Suspense fallback={<div className="admin-loading">Opening CodeTech Admin…</div>}><Admin onAddProduct={addProduct} onEditProduct={editProduct} onDeleteProduct={deleteProduct} onRestoreProduct={restoreProduct} onMarkSold={markProductSold} onReverseSale={reverseSale} onBack={() => navigate('home')} /></Suspense><Toast message={toast.msg} visible={toast.visible} /></div>;
   }
 
   return (
@@ -215,16 +278,16 @@ export default function App() {
       )}
 
       {page === 'product' && (() => {
-        const product = products.find(item => String(item.id) === selectedProductId);
+        const product = products.find(item => String(item.id) === selectedProductId) ?? (String(lookupProduct?.id) === selectedProductId ? lookupProduct : null);
         return product
           ? <ProductDetail product={product} onBack={() => navigate(product.listingGroup === 'goodies' ? 'goodies' : 'devices')} onSwap={swapForProduct} onAddToCart={addToCart} />
-          : <main className="product-not-found"><p>{catalogStatus === 'loading' ? 'Loading device details…' : 'This device is no longer listed.'}</p>{catalogStatus !== 'loading' && <a href={unlistedItemEnquiryLink()} target="_blank" rel="noreferrer">Ask us about this or a similar device ↗</a>}<button onClick={() => navigate('devices')}>Back to devices</button></main>;
+          : <main className="product-not-found"><p>{hasFirebaseConfig && (catalogStatus === 'loading' || lookupStatus !== 'missing') ? 'Loading device details…' : 'This device is no longer listed.'}</p>{(!hasFirebaseConfig || lookupStatus === 'missing') && <a href={unlistedItemEnquiryLink()} target="_blank" rel="noreferrer">Ask us about this or a similar device ↗</a>}<button onClick={() => navigate('devices')}>Back to devices</button></main>;
       })()}
 
       {/* HOME */}
       {(page === 'home' || page === 'devices' || page === 'goodies') && (
         <>
-          <Storefront view={page} products={products} catalogStatus={catalogStatus} onShop={scrollToProducts} onSell={() => navigate('sell')} onSwap={() => navigate('swap')} onGoodies={() => navigate('goodies')} onOpenProduct={openProduct} />
+          <Storefront view={page} products={products} catalogStatus={catalogStatus} hasMoreProducts={catalogHasMore} loadingMoreProducts={catalogLoadingMore} loadMoreError={catalogLoadError} onLoadMoreProducts={loadMoreCatalog} onShop={scrollToProducts} onSell={() => navigate('sell')} onSwap={() => navigate('swap')} onGoodies={() => navigate('goodies')} onOpenProduct={openProduct} />
         </>
       )}
 

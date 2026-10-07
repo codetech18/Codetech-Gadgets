@@ -7,6 +7,8 @@ import { displayImageUrl } from '../lib/displayImageUrl';
 interface AdminProps {
   onAddProduct: (product: Omit<Product, 'id'>) => Promise<void>;
   onEditProduct: (id: Product['id'], product: Omit<Product, 'id'>) => Promise<void>;
+  onDeleteProduct: (id: Product['id']) => Promise<void>;
+  onRestoreProduct: (id: Product['id']) => Promise<void>;
   onMarkSold: (id: Product['id'], soldPrice: number, serialNumber: string | null, variantId?: string) => Promise<void>;
   onReverseSale: (saleId: string, reason: string) => Promise<void>;
   onBack: () => void;
@@ -28,7 +30,7 @@ type ProductForm = {
   variants: Array<{ id: string; storage: string; price: string; stock: string }>;
 };
 
-type InventoryFilter = 'all' | 'devices' | 'goodies' | 'low-stock';
+type InventoryFilter = 'all' | 'devices' | 'goodies' | 'low-stock' | 'deleted';
 
 const EMPTY_FORM: ProductForm = {
   name: '', brand: '', price: '', oldPrice: '', category: '', condition: '', conditionNotes: '', stock: '1', badge: '', images: [], imageUrlDraft: '', listingGroup: 'devices', variants: [],
@@ -36,7 +38,7 @@ const EMPTY_FORM: ProductForm = {
 const ADMIN_EMAIL = (import.meta.env.VITE_FIREBASE_ADMIN_EMAIL || '').trim().toLowerCase();
 const INPUT_CLASS = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 
-export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onReverseSale, onBack }: AdminProps) {
+export default function Admin({ onAddProduct, onEditProduct, onDeleteProduct, onRestoreProduct, onMarkSold, onReverseSale, onBack }: AdminProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
@@ -55,6 +57,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
   const [legacyStorageWarning, setLegacyStorageWarning] = useState(false);
   const [uploadBusy, setUploadBusy] = useState(false);
   const [saveBusy, setSaveBusy] = useState(false);
+  const [productActionBusyId, setProductActionBusyId] = useState<Product['id'] | null>(null);
   const [inventoryFilter, setInventoryFilter] = useState<InventoryFilter>('all');
   const [activeSection, setActiveSection] = useState<'inventory' | 'sales'>('inventory');
   const [search, setSearch] = useState('');
@@ -348,13 +351,42 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
     setReversalError('');
   }
 
-  const activeProducts = products.filter(product => product.listingStatus !== 'sold');
+  async function deleteProduct(product: Product) {
+    if (!window.confirm(`Delete ${product.name} from the storefront and active inventory? Existing sale records will stay available. You can restore the listing from Deleted.`)) return;
+    setProductActionBusyId(product.id);
+    setInventoryError('');
+    try {
+      await onDeleteProduct(product.id);
+      await refreshInventory();
+    } catch (error) {
+      setInventoryError(error instanceof Error ? error.message : 'Could not delete this listing.');
+    } finally {
+      setProductActionBusyId(null);
+    }
+  }
+
+  async function restoreProduct(product: Product) {
+    setProductActionBusyId(product.id);
+    setInventoryError('');
+    try {
+      await onRestoreProduct(product.id);
+      await refreshInventory();
+    } catch (error) {
+      setInventoryError(error instanceof Error ? error.message : 'Could not restore this listing.');
+    } finally {
+      setProductActionBusyId(null);
+    }
+  }
+
+  const activeProducts = products.filter(product => product.listingStatus !== 'sold' && product.listingStatus !== 'deleted');
   const deviceCount = activeProducts.filter(product => product.listingGroup !== 'goodies').length;
   const goodiesCount = activeProducts.filter(product => product.listingGroup === 'goodies').length;
   const lowStockCount = activeProducts.filter(product => (product.stock ?? 0) <= 1).length;
+  const deletedCount = products.filter(product => product.listingStatus === 'deleted').length;
   const visibleProducts = products.filter(product => {
-    if (product.listingStatus === 'sold') return false;
-    const matchesFilter = inventoryFilter === 'all'
+    const deleted = product.listingStatus === 'deleted';
+    if (inventoryFilter === 'deleted' ? !deleted : deleted || product.listingStatus === 'sold') return false;
+    const matchesFilter = inventoryFilter === 'all' || inventoryFilter === 'deleted'
       || (inventoryFilter === 'devices' && product.listingGroup !== 'goodies')
       || (inventoryFilter === 'goodies' && product.listingGroup === 'goodies')
       || (inventoryFilter === 'low-stock' && (product.stock ?? 0) <= 1);
@@ -406,15 +438,16 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
           <button className={`admin-side-link ${activeSection === 'inventory' && inventoryFilter === 'devices' ? 'active' : ''}`} onClick={() => { setActiveSection('inventory'); setInventoryFilter('devices'); }}><span>◫</span> Devices <b>{deviceCount}</b></button>
           <button className={`admin-side-link ${activeSection === 'inventory' && inventoryFilter === 'goodies' ? 'active' : ''}`} onClick={() => { setActiveSection('inventory'); setInventoryFilter('goodies'); }}><span>◈</span> Goodies <b>{goodiesCount}</b></button>
           <button className={`admin-side-link ${activeSection === 'inventory' && inventoryFilter === 'low-stock' ? 'active' : ''}`} onClick={() => { setActiveSection('inventory'); setInventoryFilter('low-stock'); }}><span>◷</span> Low stock <b>{lowStockCount}</b></button>
+          <button className={`admin-side-link ${activeSection === 'inventory' && inventoryFilter === 'deleted' ? 'active' : ''}`} onClick={() => { setActiveSection('inventory'); setInventoryFilter('deleted'); }}><span>▤</span> Deleted <b>{deletedCount}</b></button>
           <button className={`admin-side-link ${activeSection === 'sales' ? 'active' : ''}`} onClick={() => setActiveSection('sales')}><span>↗</span> Sales history <b>{sales.length}</b></button>
           </nav>
           <div className="admin-sidebar-bottom"><button className="admin-side-link" onClick={onBack}><span>↗</span> View storefront</button><p>Signed in as<br/><strong>{admin.email}</strong></p></div>
         </aside>
 
         <main className="admin-main">
-          <header className="admin-topbar"><span>Store workspace <i>/</i> {activeSection === 'sales' ? 'Sales history' : inventoryFilter === 'all' ? 'Overview' : inventoryFilter === 'low-stock' ? 'Low stock' : inventoryFilter === 'goodies' ? 'Goodies' : 'Devices'}</span><div><span className="admin-secure-indicator">● Private admin</span><button onClick={() => void signOut(getFirebaseAuth())}>Sign out</button></div></header>
+          <header className="admin-topbar"><span>Store workspace <i>/</i> {activeSection === 'sales' ? 'Sales history' : inventoryFilter === 'all' ? 'Overview' : inventoryFilter === 'low-stock' ? 'Low stock' : inventoryFilter === 'goodies' ? 'Goodies' : inventoryFilter === 'deleted' ? 'Deleted' : 'Devices'}</span><div><span className="admin-secure-indicator">● Private admin</span><button onClick={() => void signOut(getFirebaseAuth())}>Sign out</button></div></header>
           <div className="admin-content">
-            <header className="admin-page-heading"><div><p className="admin-eyebrow">CODETECH GADGETS</p><h1>{activeSection === 'sales' ? 'Sales history' : inventoryFilter === 'all' ? 'Store overview' : inventoryFilter === 'low-stock' ? 'Low stock' : inventoryFilter === 'goodies' ? 'Goodies inventory' : 'Devices inventory'}</h1><p>{activeSection === 'sales' ? 'Every WhatsApp sale you record, kept for your business history.' : 'Manage the listings customers see on your storefront.'}</p></div>{activeSection === 'inventory' && <button onClick={openAdd} className="admin-primary-button">＋ Add a device</button>}</header>
+            <header className="admin-page-heading"><div><p className="admin-eyebrow">CODETECH GADGETS</p><h1>{activeSection === 'sales' ? 'Sales history' : inventoryFilter === 'all' ? 'Store overview' : inventoryFilter === 'low-stock' ? 'Low stock' : inventoryFilter === 'goodies' ? 'Goodies inventory' : inventoryFilter === 'deleted' ? 'Deleted listings' : 'Devices inventory'}</h1><p>{activeSection === 'sales' ? 'Every WhatsApp sale you record, kept for your business history.' : inventoryFilter === 'deleted' ? 'Restore a listing if it was deleted by mistake.' : 'Manage the listings customers see on your storefront.'}</p></div>{activeSection === 'inventory' && <button onClick={openAdd} className="admin-primary-button">＋ Add a device</button>}</header>
 
             {activeSection === 'inventory' && <section className="admin-stat-grid" aria-label="Inventory summary">
               <article><span>Active inventory</span><strong>{activeProducts.length}</strong><small>Not marked fully sold</small></article>
@@ -426,7 +459,7 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
 
             {activeSection === 'inventory' ? <section className="admin-inventory-panel">
               <div className="admin-inventory-heading"><div><h2>Product inventory</h2><p>{visibleProducts.length} listing{visibleProducts.length === 1 ? '' : 's'} shown · changes publish to the storefront</p></div><button className="admin-refresh-button" onClick={() => void refreshInventory()} disabled={inventoryLoading}>{inventoryLoading ? 'Refreshing…' : '↻ Refresh'}</button></div>
-              <div className="admin-inventory-controls"><div className="admin-filter-tabs">{([['all', 'All'], ['devices', 'Devices'], ['goodies', 'Goodies'], ['low-stock', 'Low stock']] as const).map(([filter, label]) => <button key={filter} className={inventoryFilter === filter ? 'selected' : ''} onClick={() => setInventoryFilter(filter)}>{label}</button>)}</div><label className="admin-search"><span>⌕</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search products" aria-label="Search products"/></label></div>
+              <div className="admin-inventory-controls"><div className="admin-filter-tabs">{([['all', 'All'], ['devices', 'Devices'], ['goodies', 'Goodies'], ['low-stock', 'Low stock'], ['deleted', 'Deleted']] as const).map(([filter, label]) => <button key={filter} className={inventoryFilter === filter ? 'selected' : ''} onClick={() => setInventoryFilter(filter)}>{label}</button>)}</div><label className="admin-search"><span>⌕</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search products" aria-label="Search products"/></label></div>
               {inventoryError && <p role="alert" className="admin-inventory-error">{inventoryError}</p>}
               {inventoryLoading ? <p className="admin-inventory-empty">Loading inventory…</p> : visibleProducts.length ? (
                 <div className="admin-table-wrap"><table className="admin-product-table admin-inventory-table"><thead><tr><th>Product</th><th>Section</th><th>Condition</th><th>Stock</th><th>Price</th><th>Actions</th></tr></thead><tbody>
@@ -436,10 +469,10 @@ export default function Admin({ onAddProduct, onEditProduct, onMarkSold, onRever
                     <td>{product.condition || '—'}</td>
                     <td><span className={`admin-stock ${((product.stock ?? 0) <= 1) ? 'low' : ''}`}>{product.stock ?? 0} {((product.stock ?? 0) === 1) ? 'unit' : 'units'}</span></td>
                     <td className="admin-price-cell">₦{product.price.toLocaleString('en-NG')}</td>
-                    <td><div className="admin-row-actions"><button onClick={() => openEdit(product)}>Edit</button><button onClick={() => openSaleRecord(product)}>Mark sold</button></div></td>
+                    <td><div className="admin-row-actions">{product.listingStatus === 'deleted' ? <button className="admin-restore-button" onClick={() => void restoreProduct(product)} disabled={productActionBusyId !== null}>{productActionBusyId === product.id ? 'Restoring…' : 'Restore'}</button> : <><button onClick={() => openEdit(product)} disabled={productActionBusyId !== null}>Edit</button><button onClick={() => openSaleRecord(product)} disabled={productActionBusyId !== null}>Mark sold</button><button onClick={() => void deleteProduct(product)} disabled={productActionBusyId !== null}>{productActionBusyId === product.id ? 'Deleting…' : 'Delete'}</button></>}</div></td>
                   </tr>)}
                 </tbody></table></div>
-              ) : <div className="admin-inventory-empty"><strong>{products.length ? 'No matching products' : 'Your inventory is empty'}</strong><span>{products.length ? 'Try a different search or filter.' : 'Add your first device to publish it on the storefront.'}</span>{!products.length && <button onClick={openAdd}>Add a device</button>}</div>}
+              ) : <div className="admin-inventory-empty"><strong>{inventoryFilter === 'deleted' && !search.trim() ? 'No deleted listings' : products.length ? 'No matching products' : 'Your inventory is empty'}</strong><span>{inventoryFilter === 'deleted' && !search.trim() ? 'Listings you delete will appear here for restoration.' : products.length ? 'Try a different search or filter.' : 'Add your first device to publish it on the storefront.'}</span>{!products.length && inventoryFilter !== 'deleted' && <button onClick={openAdd}>Add a device</button>}</div>}
             </section> : <section className="admin-inventory-panel">
               <div className="admin-inventory-heading"><div><h2>Recorded sales</h2><p>Sold inventory stays in Firestore and is listed here for reference.</p></div><button className="admin-refresh-button" onClick={() => void refreshSales()} disabled={salesLoading}>{salesLoading ? 'Refreshing…' : '↻ Refresh'}</button></div>
               {inventoryError && <p role="alert" className="admin-inventory-error">{inventoryError}</p>}

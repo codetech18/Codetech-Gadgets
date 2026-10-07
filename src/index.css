@@ -109,6 +109,13 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .empty-catalog { min-height: 200px; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 8px; color: #52617b; font-size: 14px; }
 .empty-catalog span { color: #8791a2; font-size: 13px; }
 .empty-catalog a { margin-top: 12px; color: #176c4d; font-size: 13px; font-weight: 750; text-decoration: underline; text-underline-offset: 3px; }
+.catalog-pagination { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 32px; }
+.catalog-page-controls { display: flex; align-items: center; gap: 15px; }
+.catalog-page-controls span { color: #52617b; font-size: 13px; font-weight: 700; }
+.catalog-pagination button { border: 1px solid #29499f; padding: 11px 20px; background: #fff; color: #29499f; font-size: 13px; font-weight: 750; }
+.catalog-pagination button:hover:not(:disabled) { background: #edf3ff; }
+.catalog-pagination button:disabled { cursor: not-allowed; opacity: .55; }
+.catalog-pagination > span { color: #a3534b; font-size: 12px; }
 .catalog-enquiry { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 27px; padding: 20px 24px; background: #edf3ff; border: 1px solid #dfe8fb; }
 .catalog-enquiry strong { color: #1d315d; font: 750 17px Manrope,sans-serif; }
 .catalog-enquiry p { margin: 6px 0 0; color: #586984; font-size: 13px; line-height: 1.55; }
@@ -327,6 +334,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .admin-row-actions button { border: 1px solid #e4e8ee; padding: 6px 8px; background: #fff; color: #64718a; font-size: 11px; cursor: pointer; }
 .admin-row-actions button:last-child { color: #a3534b; }
 .admin-row-actions button:hover { border-color: #bfc8d8; background: #f8f9fc; }
+.admin-row-actions .admin-restore-button { color: #176c4d; border-color: #cde5d7; }
+.admin-row-actions button:disabled { cursor: wait; opacity: .55; }
 .admin-inventory-empty { min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; color: #8490a3; font-size: 12px; }
 .admin-inventory-empty strong { color: #45536a; font-size: 14px; }
 .admin-inventory-empty button { margin-top: 3px; border: 0; padding: 8px 12px; background: #244992; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }

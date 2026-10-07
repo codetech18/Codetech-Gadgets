@@ -1,4 +1,4 @@
-import { collection, getDocs, onSnapshot, query, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, query, startAfter, where, DocumentData, QueryDocumentSnapshot } from 'firebase/firestore';
 import { Product, ProductVariant } from '../types';
 import { getDatabase } from './firebase';
 
@@ -22,7 +22,7 @@ type CatalogRecord = {
   rating?: number | string;
   reviews?: number | string;
   oldPriceNgn?: number | string;
-  status?: 'available' | 'out_of_stock' | 'sold';
+  status?: 'available' | 'out_of_stock' | 'sold' | 'deleted';
   backInStock?: boolean;
   variants?: ProductVariant[];
   createdAt?: { toMillis?: () => number };
@@ -61,8 +61,8 @@ function toProduct(id: string, record: CatalogRecord): Product | null {
     return product;
 }
 
-function productsFromCatalogSnapshot(snapshot: { docs: Array<{ id: string; data: () => Record<string, unknown> }> }): Product[] {
-  return snapshot.docs
+function productsFromCatalogDocuments(documents: Array<{ id: string; data: () => Record<string, unknown> }>): Product[] {
+  return documents
     .map(document => ({ product: toProduct(document.id, document.data() as CatalogRecord), record: document.data() as CatalogRecord }))
     .filter((item): item is { product: Product; record: CatalogRecord } => item.product !== null && (item.product.stock ?? 0) > 0)
     .sort((a, b) => Number(Boolean(b.record.featured)) - Number(Boolean(a.record.featured)) || (b.record.createdAt?.toMillis?.() ?? 0) - (a.record.createdAt?.toMillis?.() ?? 0))
@@ -73,12 +73,32 @@ function publicCatalogQuery() {
   return query(collection(getDatabase(), 'products'), where('status', '==', 'available'));
 }
 
-export async function loadFirestoreCatalog(): Promise<Product[]> {
-  return productsFromCatalogSnapshot(await getDocs(publicCatalogQuery()));
+export type CatalogCursor = QueryDocumentSnapshot<DocumentData>;
+
+export async function loadFirestoreCatalogPage(cursor: CatalogCursor | null = null, pageSize = 12) {
+  const pageQuery = cursor
+    ? query(publicCatalogQuery(), startAfter(cursor), limit(pageSize + 1))
+    : query(publicCatalogQuery(), limit(pageSize + 1));
+  const snapshot = await getDocs(pageQuery);
+  const documents = snapshot.docs.slice(0, pageSize);
+  return {
+    products: productsFromCatalogDocuments(documents),
+    cursor: documents[documents.length - 1] ?? null,
+    hasMore: snapshot.docs.length > pageSize,
+  };
 }
 
-export function subscribeFirestoreCatalog(onUpdate: (products: Product[]) => void, onError: (error: Error) => void) {
-  return onSnapshot(publicCatalogQuery(), snapshot => onUpdate(productsFromCatalogSnapshot(snapshot)), onError);
+export async function loadFirestoreProduct(id: string): Promise<Product | null> {
+  try {
+    const snapshot = await getDoc(doc(getDatabase(), 'products', id));
+    if (!snapshot.exists()) return null;
+    const record = snapshot.data() as CatalogRecord;
+    if (record.status !== 'available' || Number(record.stockQuantity ?? record.stock ?? 0) <= 0) return null;
+    return toProduct(snapshot.id, record);
+  } catch (error) {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'permission-denied') return null;
+    throw error;
+  }
 }
 
 export async function loadFirestoreInventory(): Promise<Product[]> {

@@ -7,6 +7,10 @@ type StorefrontProps = {
   view: 'home' | 'devices' | 'goodies';
   products: Product[];
   catalogStatus: 'preview' | 'loading' | 'live' | 'error';
+  hasMoreProducts: boolean;
+  loadingMoreProducts: boolean;
+  loadMoreError: string;
+  onLoadMoreProducts: () => Promise<void>;
   onShop: () => void;
   onSell: () => void;
   onSwap: () => void;
@@ -58,11 +62,15 @@ function DeviceCard({ product, onOpen }: { product: Product; onOpen: () => void 
   );
 }
 
-export default function Storefront({ view, products, catalogStatus, onShop, onSell, onSwap, onGoodies, onOpenProduct }: StorefrontProps) {
+export default function Storefront({ view, products, catalogStatus, hasMoreProducts, loadingMoreProducts, loadMoreError, onLoadMoreProducts, onShop, onSell, onSwap, onGoodies, onOpenProduct }: StorefrontProps) {
   const [activeCategory, setActiveCategory] = useState('All categories');
   const [activeCollection, setActiveCollection] = useState<(typeof stockCollections)[number]['value']>('all');
   const [search, setSearch] = useState('');
+  const [effectiveSearch, setEffectiveSearch] = useState('');
+  const [pageNumber, setPageNumber] = useState(1);
   useEffect(() => { setActiveCategory('All categories'); setActiveCollection('all'); }, [view]);
+  useEffect(() => { const timer = window.setTimeout(() => setEffectiveSearch(search.trim().toLowerCase()), 250); return () => window.clearTimeout(timer); }, [search]);
+  useEffect(() => setPageNumber(1), [view, activeCategory, activeCollection, effectiveSearch]);
   const visibleProducts = useMemo(() => products.filter(product => {
     const matchesGroup = view !== 'goodies'
       ? activeCollection === 'all'
@@ -71,11 +79,26 @@ export default function Storefront({ view, products, catalogStatus, onShop, onSe
         || (activeCollection === 'uk-used' && product.listingGroup !== 'goodies' && /uk\s*used|used/i.test(product.condition || ''))
       : product.listingGroup === 'goodies';
     const matchesCategory = categoryKeys[activeCategory] === 'all' || product.category === categoryKeys[activeCategory];
-    const query = search.trim().toLowerCase();
+    const query = effectiveSearch;
     const matchesSearch = !query || `${product.name} ${product.brand} ${product.category}`.toLowerCase().includes(query);
     return matchesGroup && matchesCategory && matchesSearch;
-  }), [products, activeCategory, activeCollection, search, view]);
-  const featuredProducts = view === 'home' ? visibleProducts.slice(0, 8) : visibleProducts;
+  }), [products, activeCategory, activeCollection, effectiveSearch, view]);
+  const displayedProducts = view === 'home' ? visibleProducts.slice(0, 8) : visibleProducts.slice((pageNumber - 1) * 12, pageNumber * 12);
+  const canGoNext = view !== 'home' && (visibleProducts.length > pageNumber * 12 || hasMoreProducts);
+
+  useEffect(() => {
+    const targetCount = view === 'home' ? 8 : pageNumber * 12;
+    if (catalogStatus === 'live' && visibleProducts.length < targetCount && hasMoreProducts && !loadingMoreProducts && !loadMoreError) void onLoadMoreProducts();
+  }, [view, catalogStatus, visibleProducts.length, pageNumber, hasMoreProducts, loadingMoreProducts, loadMoreError, onLoadMoreProducts]);
+
+  useEffect(() => {
+    if (view !== 'home' && catalogStatus === 'live' && !hasMoreProducts && !loadingMoreProducts && displayedProducts.length === 0 && pageNumber > 1) setPageNumber(current => current - 1);
+  }, [view, catalogStatus, hasMoreProducts, loadingMoreProducts, displayedProducts.length, pageNumber]);
+
+  function changePage(nextPage: number) {
+    setPageNumber(nextPage);
+    window.requestAnimationFrame(() => document.getElementById('products')?.scrollIntoView({ behavior: 'instant', block: 'start' }));
+  }
 
   return (
     <main className="storefront">
@@ -108,7 +131,7 @@ export default function Storefront({ view, products, catalogStatus, onShop, onSe
           <div className="category-tabs" role="tablist" aria-label={view === 'goodies' ? 'Filter by device category' : 'Filter by stock type'}>
             {view === 'goodies' ? categories.map(category => <button key={category} role="tab" aria-selected={activeCategory === category} className={activeCategory === category ? 'active' : ''} onClick={() => setActiveCategory(category)}>{category === 'All categories' ? 'All goodies' : category}</button>) : stockCollections.map(collection => <button key={collection.value} role="tab" aria-selected={activeCollection === collection.value} className={activeCollection === collection.value ? 'active' : ''} onClick={() => setActiveCollection(collection.value)}>{collection.label}</button>)}
           </div>
-          <span className="results-count">{featuredProducts.length}{view === 'home' && visibleProducts.length > 8 ? ` of ${visibleProducts.length}` : ''} {view === 'goodies' || activeCollection === 'goodies' ? 'goodies' : activeCollection === 'all' ? 'items' : 'devices'}</span>
+          <span className="results-count">{view !== 'home' ? `Page ${pageNumber} · ` : ''}{displayedProducts.length} {view === 'goodies' || activeCollection === 'goodies' ? 'goodies' : activeCollection === 'all' ? 'items' : 'devices'} shown</span>
         </div>
         {view === 'devices' && <div className="catalog-tools catalog-tools-secondary">
           <span className="catalog-filter-label">Category</span>
@@ -116,13 +139,19 @@ export default function Storefront({ view, products, catalogStatus, onShop, onSe
             {categories.map(category => <button key={category} role="tab" aria-selected={activeCategory === category} className={activeCategory === category ? 'active' : ''} onClick={() => setActiveCategory(category)}>{category}</button>)}
           </div>
         </div>}
-        {catalogStatus !== 'loading' && catalogStatus !== 'error' && featuredProducts.length > 0 && <aside className="catalog-enquiry">
+        {catalogStatus !== 'loading' && catalogStatus !== 'error' && displayedProducts.length > 0 && <aside className="catalog-enquiry">
           <div><strong>Can’t find the device you want?</strong><p>Some items may not be listed here. Send us what you’re looking for and we’ll check availability.</p></div>
           <a href={unlistedItemEnquiryLink(search)} target="_blank" rel="noreferrer">Ask us on WhatsApp <Arrow diagonal /></a>
         </aside>}
-        {catalogStatus === 'loading' ? <div className="empty-catalog"><strong>Loading current inventory…</strong><span>Fetching available devices.</span></div> : catalogStatus === 'error' ? <div className="empty-catalog"><strong>Inventory is temporarily unavailable.</strong><span>You can still ask our team about a device.</span><a href={unlistedItemEnquiryLink(search)} target="_blank" rel="noreferrer">Enquire on WhatsApp ↗</a></div> : featuredProducts.length ? <div className="device-grid">
-          {featuredProducts.map(product => <DeviceCard key={product.id} product={product} onOpen={() => onOpenProduct(product)} />)}
-        </div> : <div className="empty-catalog"><strong>No matching listings right now.</strong><span>Tell us what you’re looking for and we’ll check for you.</span><a href={unlistedItemEnquiryLink(search)} target="_blank" rel="noreferrer">Enquire on WhatsApp ↗</a></div>}
+        {catalogStatus === 'loading' ? <div className="empty-catalog"><strong>Loading current inventory…</strong><span>Fetching available devices.</span></div> : catalogStatus === 'error' ? <div className="empty-catalog"><strong>Inventory is temporarily unavailable.</strong><span>You can still ask our team about a device.</span><a href={unlistedItemEnquiryLink(search)} target="_blank" rel="noreferrer">Enquire on WhatsApp ↗</a></div> : displayedProducts.length ? <div className="device-grid">
+          {displayedProducts.map(product => <DeviceCard key={product.id} product={product} onOpen={() => onOpenProduct(product)} />)}
+        </div> : hasMoreProducts ? <div className="empty-catalog"><strong>{loadMoreError ? 'Could not load this page.' : 'Checking more listings…'}</strong><span>{loadMoreError ? 'Try again below.' : 'Looking for items that match your filters.'}</span></div> : <div className="empty-catalog"><strong>No matching listings right now.</strong><span>Tell us what you’re looking for and we’ll check for you.</span><a href={unlistedItemEnquiryLink(search)} target="_blank" rel="noreferrer">Enquire on WhatsApp ↗</a></div>}
+        {view !== 'home' && catalogStatus === 'live' && (pageNumber > 1 || canGoNext || loadMoreError) && <div className="catalog-pagination">
+          {loadMoreError && <span role="alert">{loadMoreError}</span>}
+          <div className="catalog-page-controls"><button type="button" disabled={pageNumber === 1 || loadingMoreProducts} onClick={() => changePage(pageNumber - 1)}>← Previous</button><span>Page {pageNumber}</span><button type="button" disabled={!canGoNext || loadingMoreProducts || Boolean(loadMoreError)} onClick={() => changePage(pageNumber + 1)}>Next →</button></div>
+          {loadMoreError && <button type="button" onClick={() => void onLoadMoreProducts()}>Try again</button>}
+        </div>}
+        {view === 'home' && loadMoreError && <div className="catalog-pagination"><span role="alert">{loadMoreError}</span><button type="button" onClick={() => void onLoadMoreProducts()}>Try again</button></div>}
         <div className="catalog-footnote">{view === 'goodies' ? <button onClick={onShop}>Browse devices <Arrow /></button> : view === 'devices' ? <button onClick={onGoodies}>Explore Goodies <Arrow /></button> : activeCollection === 'goodies' ? <button onClick={onGoodies}>See all Goodies <Arrow /></button> : <button onClick={onShop}>See all devices <Arrow /></button>}</div>
       </section>
 

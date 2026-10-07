@@ -50,6 +50,29 @@ export async function updateInventoryProduct(id: string, product: ProductDraft) 
   return batch.commit();
 }
 
+export async function deleteInventoryProduct(id: string) {
+  const database = getDatabase();
+  const productRef = doc(database, 'products', id);
+  await runTransaction(database, async transaction => {
+    const snapshot = await transaction.get(productRef);
+    if (!snapshot.exists()) throw new Error('This inventory item no longer exists.');
+    if (snapshot.data().status === 'deleted') return;
+    transaction.update(productRef, { status: 'deleted', deletedAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  });
+}
+
+export async function restoreInventoryProduct(id: string) {
+  const database = getDatabase();
+  const productRef = doc(database, 'products', id);
+  await runTransaction(database, async transaction => {
+    const snapshot = await transaction.get(productRef);
+    if (!snapshot.exists()) throw new Error('This inventory item no longer exists.');
+    if (snapshot.data().status !== 'deleted') throw new Error('This listing is not deleted.');
+    const stock = Math.max(0, Number(snapshot.data().stockQuantity ?? 0));
+    transaction.update(productRef, { status: stock > 0 ? 'available' : 'out_of_stock', restoredAt: serverTimestamp(), updatedAt: serverTimestamp() });
+  });
+}
+
 export async function markInventoryProductSold(id: string, soldPrice: number, serialNumber: string | null, variantId?: string) {
   if (!Number.isFinite(soldPrice) || soldPrice < 0) throw new Error('Enter a valid final sale price.');
   if (serialNumber !== null && !serialNumber.trim()) throw new Error('Enter the sold item identifier or choose that it has no identifier.');
@@ -63,6 +86,7 @@ export async function markInventoryProductSold(id: string, soldPrice: number, se
 
     const product = snapshot.data();
     if (product.status === 'sold') throw new Error('This item has already been marked as sold.');
+    if (product.status === 'deleted') throw new Error('Restore this listing before recording another sale.');
     const variants = Array.isArray(product.variants) ? product.variants as Product['variants'] : [];
     const selectedVariant = variants?.find(variant => variant.id === variantId);
     if (variants?.length && (!selectedVariant || selectedVariant.stock <= 0)) throw new Error('Choose an available storage option.');
@@ -133,8 +157,8 @@ export async function reverseInventorySale(saleId: string, reason: string) {
     transaction.update(productRef!, {
       stockQuantity: currentStock + 1,
       ...(variants?.length ? { variants: nextVariants, priceNgn: availablePrices.length ? Math.min(...availablePrices) : productSnapshot.data().priceNgn } : {}),
-      status: 'available',
-      backInStock: true,
+      status: productSnapshot.data().status === 'deleted' ? 'deleted' : 'available',
+      backInStock: productSnapshot.data().status !== 'deleted',
       restockedAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
