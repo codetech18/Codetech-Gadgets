@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect, lazy, Suspense } from 'react';
+import { useState, useCallback, useRef, useEffect, useLayoutEffect, lazy, Suspense } from 'react';
 import { Page, Product, CartItem, User } from './types';
 import { INITIAL_PRODUCTS } from './data/products';
 import Navbar from './components/Navbar';
@@ -73,6 +73,10 @@ export default function App() {
     return () => window.removeEventListener('popstate', restoreRoute);
   }, []);
 
+  useLayoutEffect(() => {
+    if (page === 'product') window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [page, selectedProductId]);
+
   function showToast(msg: string) {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     setToast({ msg, visible: true });
@@ -96,7 +100,6 @@ export default function App() {
     setSelectedProductId(String(product.id));
     setPage('product');
     setSwapTargetName('');
-    window.scrollTo(0, 0);
   }
 
   function swapForProduct(product: Product) {
