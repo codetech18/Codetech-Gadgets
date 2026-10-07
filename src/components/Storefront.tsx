@@ -14,15 +14,15 @@ type StorefrontProps = {
   onOpenProduct: (product: Product) => void;
 };
 
-const categories = ['All devices', 'Phones', 'Laptops', 'Tablets', 'Audio', 'Wearables'];
-const homeCollections = [
-  { label: 'All devices', value: 'all' },
-  { label: 'UK used', value: 'uk-used' },
+const categories = ['All categories', 'Phones', 'Laptops', 'Tablets', 'Audio', 'Wearables'];
+const stockCollections = [
+  { label: 'All items', value: 'all' },
   { label: 'Brand new', value: 'brand-new' },
+  { label: 'UK used', value: 'uk-used' },
   { label: 'Goodies', value: 'goodies' },
 ] as const;
 const categoryKeys: Record<string, string> = {
-  'All devices': 'all', Phones: 'phones', Laptops: 'laptops', Tablets: 'tablets', Audio: 'audio', Wearables: 'wearables',
+  'All categories': 'all', Phones: 'phones', Laptops: 'laptops', Tablets: 'tablets', Audio: 'audio', Wearables: 'wearables',
 };
 const money = (amount: number) => `₦${amount.toLocaleString('en-NG')}`;
 
@@ -59,17 +59,17 @@ function DeviceCard({ product, onOpen }: { product: Product; onOpen: () => void 
 }
 
 export default function Storefront({ view, products, catalogStatus, onShop, onSell, onSwap, onGoodies, onOpenProduct }: StorefrontProps) {
-  const [activeCategory, setActiveCategory] = useState('All devices');
-  const [activeCollection, setActiveCollection] = useState<(typeof homeCollections)[number]['value']>('all');
+  const [activeCategory, setActiveCategory] = useState('All categories');
+  const [activeCollection, setActiveCollection] = useState<(typeof stockCollections)[number]['value']>('all');
   const [search, setSearch] = useState('');
-  useEffect(() => { setActiveCategory('All devices'); setActiveCollection('all'); }, [view]);
+  useEffect(() => { setActiveCategory('All categories'); setActiveCollection('all'); }, [view]);
   const visibleProducts = useMemo(() => products.filter(product => {
-    const matchesGroup = view === 'home'
+    const matchesGroup = view !== 'goodies'
       ? activeCollection === 'all'
         || (activeCollection === 'goodies' && product.listingGroup === 'goodies')
         || (activeCollection === 'brand-new' && product.listingGroup !== 'goodies' && /brand\s*new/i.test(product.condition || ''))
         || (activeCollection === 'uk-used' && product.listingGroup !== 'goodies' && /uk\s*used|used/i.test(product.condition || ''))
-      : view === 'goodies' ? product.listingGroup === 'goodies' : product.listingGroup !== 'goodies';
+      : product.listingGroup === 'goodies';
     const matchesCategory = categoryKeys[activeCategory] === 'all' || product.category === categoryKeys[activeCategory];
     const query = search.trim().toLowerCase();
     const matchesSearch = !query || `${product.name} ${product.brand} ${product.category}`.toLowerCase().includes(query);
@@ -96,7 +96,7 @@ export default function Storefront({ view, products, catalogStatus, onShop, onSe
       </section>
       </> : <section className="catalog-page-intro">
         <h1>{view === 'goodies' ? 'Goodies' : 'Devices'}</h1>
-        <p>{view === 'goodies' ? 'Lower prices, with each item’s condition clearly shown.' : 'UK-used and brand-new devices.'}</p>
+        <p>{view === 'goodies' ? 'Lower prices, with each item’s condition clearly shown.' : 'Browse brand-new devices, UK-used devices, and Goodies.'}</p>
       </section>}
 
       <section className="catalog-section" id="products">
@@ -104,12 +104,18 @@ export default function Storefront({ view, products, catalogStatus, onShop, onSe
           <div>{view === 'home' && <h2>{activeCollection === 'goodies' ? 'Goodies' : 'Shop what’s available'}</h2>}{catalogStatus === 'preview' && <p className="sample-note">Sample listings shown. Live inventory is not connected.</p>}</div>
           <label className="catalog-search"><span aria-hidden="true">⌕</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search devices" aria-label="Search devices" /></label>
         </div>
-        <div className="catalog-tools">
-          <div className="category-tabs" role="tablist" aria-label={view === 'home' ? 'Filter by stock type' : 'Filter by device category'}>
-            {view === 'home' ? homeCollections.map(collection => <button key={collection.value} role="tab" aria-selected={activeCollection === collection.value} className={activeCollection === collection.value ? 'active' : ''} onClick={() => setActiveCollection(collection.value)}>{collection.label}</button>) : categories.map(category => <button key={category} role="tab" aria-selected={activeCategory === category} className={activeCategory === category ? 'active' : ''} onClick={() => setActiveCategory(category)}>{view === 'goodies' && category === 'All devices' ? 'All goodies' : category}</button>)}
+        <div className={`catalog-tools ${view === 'devices' ? 'catalog-tools-primary' : ''}`}>
+          <div className="category-tabs" role="tablist" aria-label={view === 'goodies' ? 'Filter by device category' : 'Filter by stock type'}>
+            {view === 'goodies' ? categories.map(category => <button key={category} role="tab" aria-selected={activeCategory === category} className={activeCategory === category ? 'active' : ''} onClick={() => setActiveCategory(category)}>{category === 'All categories' ? 'All goodies' : category}</button>) : stockCollections.map(collection => <button key={collection.value} role="tab" aria-selected={activeCollection === collection.value} className={activeCollection === collection.value ? 'active' : ''} onClick={() => setActiveCollection(collection.value)}>{collection.label}</button>)}
           </div>
-          <span className="results-count">{featuredProducts.length}{view === 'home' && visibleProducts.length > 8 ? ` of ${visibleProducts.length}` : ''} {view === 'goodies' || activeCollection === 'goodies' ? 'goodies' : 'devices'}</span>
+          <span className="results-count">{featuredProducts.length}{view === 'home' && visibleProducts.length > 8 ? ` of ${visibleProducts.length}` : ''} {view === 'goodies' || activeCollection === 'goodies' ? 'goodies' : activeCollection === 'all' ? 'items' : 'devices'}</span>
         </div>
+        {view === 'devices' && <div className="catalog-tools catalog-tools-secondary">
+          <span className="catalog-filter-label">Category</span>
+          <div className="category-tabs" role="tablist" aria-label="Filter by device category">
+            {categories.map(category => <button key={category} role="tab" aria-selected={activeCategory === category} className={activeCategory === category ? 'active' : ''} onClick={() => setActiveCategory(category)}>{category}</button>)}
+          </div>
+        </div>}
         {catalogStatus !== 'loading' && catalogStatus !== 'error' && featuredProducts.length > 0 && <aside className="catalog-enquiry">
           <div><strong>Can’t find the device you want?</strong><p>Some items may not be listed here. Send us what you’re looking for and we’ll check availability.</p></div>
           <a href={unlistedItemEnquiryLink(search)} target="_blank" rel="noreferrer">Ask us on WhatsApp <Arrow diagonal /></a>

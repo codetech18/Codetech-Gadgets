@@ -75,6 +75,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .catalog-search input { width: 100%; min-width: 0; border: 0; outline: 0; color: #24324c; background: transparent; font-size: 13px; }
 .catalog-search kbd { padding: 3px 5px; border: 1px solid #e7eaf0; color: #9aa2af; font-size: 11px; white-space: nowrap; }
 .catalog-tools { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin: 29px 0 23px; padding-bottom: 14px; border-bottom: 1px solid #e9edf2; }
+.catalog-tools-primary { margin-bottom: 0; }
+.catalog-tools-secondary { justify-content: flex-start; margin-top: 12px; }
+.catalog-filter-label { color: #8791a2; font-size: 12px; font-weight: 700; }
 .category-tabs { display: flex; align-items: center; gap: 25px; overflow: auto; scrollbar-width: none; }
 .category-tabs::-webkit-scrollbar { display: none; }
 .category-tabs button { position: relative; flex: 0 0 auto; border: 0; padding: 5px 0; background: transparent; color: #8a93a3; font-size: 13px; font-weight: 600; }
@@ -384,6 +387,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .catalog-heading h2, .trade-intro h2 { font-size: 31px; }
   .catalog-search { width: 100%; height: 42px; }
   .catalog-tools { display: block; margin: 26px 0 19px; }
+  .catalog-tools-primary { margin-bottom: 0; }
+  .catalog-tools-secondary { margin-top: 12px; }
+  .catalog-filter-label { display: block; margin-bottom: 10px; }
   .category-tabs { gap: 20px; }
   .category-tabs button { font-size: 12px; }
   .category-tabs button.active::after { bottom: -15px; }
