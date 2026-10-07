@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Product } from '../types';
 import { displayImageUrl } from '../lib/displayImageUrl';
+import { unlistedItemEnquiryLink } from '../lib/unlistedItemEnquiry';
 
 type StorefrontProps = {
   view: 'home' | 'devices' | 'goodies';
@@ -110,9 +111,13 @@ export default function Storefront({ view, products, catalogStatus, onShop, onSe
           </div>
           <span className="results-count">{featuredProducts.length}{view === 'home' && visibleProducts.length > 8 ? ` of ${visibleProducts.length}` : ''} {view === 'goodies' || activeCollection === 'goodies' ? 'goodies' : 'devices'}</span>
         </div>
-        {catalogStatus === 'loading' ? <div className="empty-catalog"><strong>Loading current inventory…</strong><span>Fetching available devices.</span></div> : catalogStatus === 'error' ? <div className="empty-catalog"><strong>Inventory is temporarily unavailable.</strong><span>Please try again in a moment or contact us on WhatsApp.</span></div> : featuredProducts.length ? <div className="device-grid">
+        {catalogStatus !== 'loading' && catalogStatus !== 'error' && featuredProducts.length > 0 && <aside className="catalog-enquiry">
+          <div><strong>Can’t find the device you want?</strong><p>Some items may not be listed here. Send us what you’re looking for and we’ll check availability.</p></div>
+          <a href={unlistedItemEnquiryLink(search)} target="_blank" rel="noreferrer">Ask us on WhatsApp <Arrow diagonal /></a>
+        </aside>}
+        {catalogStatus === 'loading' ? <div className="empty-catalog"><strong>Loading current inventory…</strong><span>Fetching available devices.</span></div> : catalogStatus === 'error' ? <div className="empty-catalog"><strong>Inventory is temporarily unavailable.</strong><span>You can still ask our team about a device.</span><a href={unlistedItemEnquiryLink(search)} target="_blank" rel="noreferrer">Enquire on WhatsApp ↗</a></div> : featuredProducts.length ? <div className="device-grid">
           {featuredProducts.map(product => <DeviceCard key={product.id} product={product} onOpen={() => onOpenProduct(product)} />)}
-        </div> : <div className="empty-catalog"><strong>No devices found.</strong><span>Try another search or category.</span></div>}
+        </div> : <div className="empty-catalog"><strong>No matching listings right now.</strong><span>Tell us what you’re looking for and we’ll check for you.</span><a href={unlistedItemEnquiryLink(search)} target="_blank" rel="noreferrer">Enquire on WhatsApp ↗</a></div>}
         <div className="catalog-footnote">{view === 'goodies' ? <button onClick={onShop}>Browse devices <Arrow /></button> : view === 'devices' ? <button onClick={onGoodies}>Explore Goodies <Arrow /></button> : activeCollection === 'goodies' ? <button onClick={onGoodies}>See all Goodies <Arrow /></button> : <button onClick={onShop}>See all devices <Arrow /></button>}</div>
       </section>
 

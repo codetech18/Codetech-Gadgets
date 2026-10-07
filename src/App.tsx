@@ -9,6 +9,7 @@ import Support from './components/Support';
 import Toast from './components/Toast';
 import TradeRequest from './components/TradeRequest';
 import ProductDetail from './components/ProductDetail';
+import { unlistedItemEnquiryLink } from './lib/unlistedItemEnquiry';
 
 const Admin = lazy(() => import('./components/Admin'));
 
@@ -213,7 +214,7 @@ export default function App() {
         const product = products.find(item => String(item.id) === selectedProductId);
         return product
           ? <ProductDetail product={product} onBack={() => navigate(product.listingGroup === 'goodies' ? 'goodies' : 'devices')} onSwap={swapForProduct} onAddToCart={addToCart} />
-          : <main className="product-not-found"><p>{catalogStatus === 'loading' ? 'Loading device details…' : 'This device is no longer available.'}</p><button onClick={() => navigate('devices')}>Back to devices</button></main>;
+          : <main className="product-not-found"><p>{catalogStatus === 'loading' ? 'Loading device details…' : 'This device is no longer listed.'}</p>{catalogStatus !== 'loading' && <a href={unlistedItemEnquiryLink()} target="_blank" rel="noreferrer">Ask us about this or a similar device ↗</a>}<button onClick={() => navigate('devices')}>Back to devices</button></main>;
       })()}
 
       {/* HOME */}
