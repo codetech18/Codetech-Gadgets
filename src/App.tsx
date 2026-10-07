@@ -249,7 +249,7 @@ export default function App() {
       {/* SUPPORT */}
       {page === 'complaint' && <Support onToast={showToast} />}
 
-      <StoreFooter onAdmin={() => navigate('admin')} />
+      <StoreFooter />
       <Toast message={toast.msg} visible={toast.visible} />
     </div>
   );

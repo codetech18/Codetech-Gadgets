@@ -151,7 +151,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .store-footer address { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px 12px; color: #667287; font-size: 12px; font-style: normal; line-height: 1.5; }
 .store-footer address strong { color: #26344c; }
 .store-footer > small { grid-column: 1 / -1; border-top: 1px solid #e9edf2; padding-top: 12px; color: #a1a8b4; font-size: 12px; }
-.admin-footer-link { margin-left: 14px; border: 0; padding: 0; background: transparent; color: #7f899a; font-size: inherit; text-decoration: underline; text-underline-offset: 2px; }
 
 .product-dialog-backdrop { position: fixed; z-index: 100; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(12,20,38,.56); }
 .product-dialog { position: relative; width: min(760px,100%); display: grid; grid-template-columns: .92fr 1.08fr; background: #fff; box-shadow: 0 24px 100px #08163544; }
