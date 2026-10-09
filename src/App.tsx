@@ -13,25 +13,14 @@ import StoreFooter from './components/StoreFooter';
 import { unlistedItemEnquiryLink } from './lib/unlistedItemEnquiry';
 import type { CatalogCursor } from './lib/firestoreCatalog';
 
+import { readRoute, pagePath, productPath } from './lib/routes';
+import { applySeo, buildSeo } from './lib/seo';
+
 const Admin = lazy(() => import('./components/Admin'));
-
-function applicationBasePath() {
-  const path = window.location.pathname.replace(/admin\/?$/, '');
-  return path || '/';
-}
-
-function readRoute() {
-  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
-  if (pathname.endsWith('/admin')) return { page: 'admin' as Page, productId: null };
-  const route = decodeURIComponent(window.location.hash.slice(1));
-  if (route.startsWith('product/')) return { page: 'product' as Page, productId: route.slice('product/'.length) };
-  const validPages: Page[] = ['home', 'devices', 'goodies', 'cart', 'login', 'signup', 'profile', 'complaint', 'admin', 'sell', 'swap'];
-  return { page: validPages.includes(route as Page) ? route as Page : 'home', productId: null };
-}
 
 export default function App() {
   const hasFirebaseConfig = Boolean(import.meta.env.VITE_FIREBASE_API_KEY && import.meta.env.VITE_FIREBASE_PROJECT_ID && import.meta.env.VITE_FIREBASE_APP_ID);
-  const [initialRoute] = useState(readRoute);
+  const [initialRoute] = useState(() => readRoute(window.location.pathname, window.location.hash));
   const [page, setPage] = useState<Page>(initialRoute.page);
   const [selectedProductId, setSelectedProductId] = useState<string | null>(initialRoute.productId);
   const [swapTargetName, setSwapTargetName] = useState('');
@@ -51,9 +40,10 @@ export default function App() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
-    if (pathname.endsWith('/admin') && window.location.hash === '#admin') {
-      window.history.replaceState(window.history.state, '', `${window.location.pathname}${window.location.search}`);
+    const route = readRoute(window.location.pathname, window.location.hash);
+    if (!route.unknown) {
+      const target = route.productId ? productPath(route.productId) : pagePath(route.page);
+      window.history.replaceState(window.history.state, '', `${target}${window.location.search}`);
     }
   }, []);
 
@@ -119,13 +109,14 @@ export default function App() {
 
   useEffect(() => {
     const restoreRoute = () => {
-      const route = readRoute();
+      const route = readRoute(window.location.pathname, window.location.hash);
       setPage(route.page);
       setSelectedProductId(route.productId);
       setSwapTargetName('');
     };
     window.addEventListener('popstate', restoreRoute);
-    return () => window.removeEventListener('popstate', restoreRoute);
+    window.addEventListener('hashchange', restoreRoute);
+    return () => { window.removeEventListener('popstate', restoreRoute); window.removeEventListener('hashchange', restoreRoute); };
   }, []);
 
   useLayoutEffect(() => {
@@ -139,10 +130,7 @@ export default function App() {
   }
 
   function navigate(p: Page) {
-    const basePath = applicationBasePath();
-    const target = p === 'admin'
-      ? `${basePath}admin${window.location.search}`
-      : `${basePath}${window.location.search}${p === 'home' ? '' : `#${p}`}`;
+    const target = `${pagePath(p)}${window.location.search}`;
     window.history.pushState(null, '', target);
     setPage(p);
     setSelectedProductId(null);
@@ -151,7 +139,7 @@ export default function App() {
   }
 
   function openProduct(product: Product) {
-    window.history.pushState(null, '', `${applicationBasePath()}${window.location.search}#product/${encodeURIComponent(String(product.id))}`);
+    window.history.pushState(null, '', `${productPath(product.id)}${window.location.search}`);
     setSelectedProductId(String(product.id));
     setPage('product');
     setSwapTargetName('');
@@ -255,6 +243,16 @@ export default function App() {
     await refreshCatalog();
     showToast('Sale reversed. One unit is back in stock and available for resale.');
   }
+
+  const selectedProduct = page === 'product'
+    ? products.find(item => String(item.id) === selectedProductId) ?? (String(lookupProduct?.id) === selectedProductId ? lookupProduct : null)
+    : null;
+  useEffect(() => {
+    const route = readRoute(window.location.pathname, window.location.hash);
+    const missing = Boolean(route.unknown) || (page === 'product' && !selectedProduct && (!hasFirebaseConfig || lookupStatus === 'missing'));
+    const path = page === 'product' && selectedProductId ? productPath(selectedProductId) : pagePath(page);
+    applySeo(buildSeo(page, path, selectedProduct, missing));
+  }, [page, selectedProductId, selectedProduct, hasFirebaseConfig, lookupStatus]);
 
   const cartCount = cart.reduce((s, x) => s + x.qty, 0);
 

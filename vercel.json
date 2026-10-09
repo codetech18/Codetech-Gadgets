@@ -1,5 +1,10 @@
 {
   "rewrites": [
-    { "source": "/admin", "destination": "/index.html" }
+    { "source": "/sitemap.xml", "destination": "/api/sitemap" },
+    { "source": "/product/:id", "destination": "/index.html" },
+    { "source": "/:page(devices|goodies|sell|swap|cart|login|signup|profile|complaint|admin)", "destination": "/index.html" }
+  ],
+  "headers": [
+    { "source": "/:page(cart|login|signup|profile|complaint|admin)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] }
   ]
 }

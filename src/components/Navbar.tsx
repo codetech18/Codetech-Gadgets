@@ -1,3 +1,4 @@
+import { pagePath } from '../lib/routes';
 import { useState } from 'react';
 import { Page, User } from '../types';
 
@@ -13,20 +14,25 @@ interface NavbarProps {
 export default function Navbar({ currentPage, cartCount, onNavigate, onScrollToProducts }: NavbarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const goShop = () => { onScrollToProducts(); setMenuOpen(false); };
+  const linkClick = (event: React.MouseEvent<HTMLAnchorElement>, page: Page) => {
+    if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (page === 'devices') goShop(); else go(page);
+  };
   const go = (page: Page) => { onNavigate(page); setMenuOpen(false); };
 
   return <>
     <header className="site-header">
-      <button className="brand-lockup" onClick={() => go('home')} aria-label="CodeTech Gadgets home">
+      <a href="/" className="brand-lockup" onClick={event => linkClick(event, 'home')} aria-label="CodeTech Gadgets home">
         <img src="/codetech-mark.jpg" alt="" />
         <span className="brand-wordmark"><strong>CodeTech</strong><small>GADGETS</small></span>
-      </button>
+      </a>
       <nav className="desktop-nav" aria-label="Main navigation">
-        <button className={currentPage === 'home' ? 'nav-active' : ''} onClick={() => go('home')}>Home</button>
-        <button className={currentPage === 'devices' ? 'nav-active' : ''} onClick={goShop}>Devices</button>
-        <button className={currentPage === 'goodies' ? 'nav-active' : ''} onClick={() => go('goodies')}>Goodies</button>
-        <button className={currentPage === 'sell' ? 'nav-active' : ''} onClick={() => go('sell')}>Sell</button>
-        <button className={currentPage === 'swap' ? 'nav-active' : ''} onClick={() => go('swap')}>Swap</button>
+        <a href={pagePath('home')} className={currentPage === 'home' ? 'nav-active' : ''} onClick={event => linkClick(event, 'home')}>Home</a>
+        <a href={pagePath('devices')} className={currentPage === 'devices' ? 'nav-active' : ''} onClick={event => linkClick(event, 'devices')}>Devices</a>
+        <a href={pagePath('goodies')} className={currentPage === 'goodies' ? 'nav-active' : ''} onClick={event => linkClick(event, 'goodies')}>Goodies</a>
+        <a href={pagePath('sell')} className={currentPage === 'sell' ? 'nav-active' : ''} onClick={event => linkClick(event, 'sell')}>Sell</a>
+        <a href={pagePath('swap')} className={currentPage === 'swap' ? 'nav-active' : ''} onClick={event => linkClick(event, 'swap')}>Swap</a>
       </nav>
       <div className="header-actions">
         <button className="cart-button" onClick={() => go('cart')} aria-label={`Purchase request list, ${cartCount} items`}>
@@ -37,11 +43,11 @@ export default function Navbar({ currentPage, cartCount, onNavigate, onScrollToP
       </div>
     </header>
     {menuOpen && <div className="mobile-menu">
-      <button onClick={() => go('home')}>Home</button>
-      <button onClick={goShop}>Devices</button>
-      <button onClick={() => go('goodies')}>Goodies</button>
-      <button onClick={() => go('sell')}>Sell</button>
-      <button onClick={() => go('swap')}>Swap</button>
+      <a className="mobile-nav-link" href={pagePath('home')} onClick={event => linkClick(event, 'home')}>Home</a>
+      <a className="mobile-nav-link" href="/devices" onClick={event => linkClick(event, 'devices')}>Devices</a>
+      <a className="mobile-nav-link" href={pagePath('goodies')} onClick={event => linkClick(event, 'goodies')}>Goodies</a>
+      <a className="mobile-nav-link" href={pagePath('sell')} onClick={event => linkClick(event, 'sell')}>Sell</a>
+      <a className="mobile-nav-link" href={pagePath('swap')} onClick={event => linkClick(event, 'swap')}>Swap</a>
       <a href="https://wa.me/2349058977101" target="_blank" rel="noreferrer">WhatsApp ↗</a>
     </div>}
   </>;

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Product } from '../types';
 import { displayImageUrl } from '../lib/displayImageUrl';
+import { productPath } from '../lib/routes';
 import { unlistedItemEnquiryLink } from '../lib/unlistedItemEnquiry';
 
 type StorefrontProps = {
@@ -44,7 +45,7 @@ function DeviceCard({ product, onOpen }: { product: Product; onOpen: () => void 
         ? 'UK Used'
         : product.condition || 'Quality checked';
   return (
-    <button className="device-card" onClick={onOpen} aria-label={`View ${product.name}`}>
+    <a className="device-card" href={productPath(product.id)} onClick={event => { if (event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey) { event.preventDefault(); onOpen(); } }} aria-label={`View ${product.name}`}>
       <div className="device-image-wrap">
         {product.badge && <span className="device-badge">{product.badge}</span>}
         <span className={`device-condition-badge ${itemLabel === 'Goodies' ? 'goodies' : itemLabel === 'Brand New' ? 'brand-new' : ''}`}>{itemLabel}</span>
@@ -58,7 +59,7 @@ function DeviceCard({ product, onOpen }: { product: Product; onOpen: () => void 
         {product.listingGroup === 'goodies' && product.conditionNotes && <p className="device-condition-note">{product.conditionNotes}</p>}
         <div className="device-price-line"><strong>{product.variants && product.variants.filter(variant => variant.stock > 0).length > 1 ? 'From ' : ''}{money(product.price)}</strong></div>
       </div>
-    </button>
+    </a>
   );
 }
 
