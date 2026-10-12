@@ -286,12 +286,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .admin-page-heading p:not(.admin-eyebrow) { margin: 7px 0 0; color: #8490a3; font-size: 13px; }
 .admin-primary-button { min-height: 39px; border: 1px solid #21448f; padding: 0 14px; background: #244992; color: #fff; font-size: 12px; font-weight: 750; cursor: pointer; }
 .admin-primary-button:hover { background: #1b3a7b; }
+.admin-heading-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; flex-shrink: 0; }
 .admin-stat-grid { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 13px; margin-bottom: 23px; }
 .admin-stat-grid article { min-height: 120px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 16px 18px; border: 1px solid #e7eaf0; background: #fff; }
 .admin-stat-grid article > span { color: #7d899d; font-size: 12px; }
 .admin-stat-grid article > strong { margin-top: 10px; color: #1c315c; font: 750 26px Manrope,sans-serif; }
 .admin-stat-grid article > small { margin-top: 3px; color: #a0a8b5; font-size: 12px; }
 .admin-stat-grid article.attention > strong { color: #b37b29; }
+.admin-stat-grid.admin-sales-summary { grid-template-columns: repeat(3,minmax(0,1fr)); }
+.admin-sales-summary article > strong { font-size: clamp(16px, 2vw, 24px); overflow-wrap: anywhere; }
 .admin-inventory-panel { border: 1px solid #e6eaf0; background: #fff; }
 .admin-inventory-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 19px 21px; }
 .admin-inventory-heading h2 { margin: 0; color: #263650; font: 700 14px Manrope,sans-serif; }
@@ -320,6 +323,9 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .admin-product-cell small { color: #969eab; font-size: 11px; }
 .admin-section-pill { padding: 5px 7px; background: #eef2fb; color: #46619e; font-size: 11px; }
 .admin-section-pill.goodies { background: #fff5e6; color: #936c2d; }
+.admin-section-pill.outside { background: #f2edff; color: #70529b; }
+.admin-product-cell .admin-sale-note { max-width: 235px; white-space: normal; overflow-wrap: anywhere; line-height: 1.5; }
+.admin-sale-money { display: block; margin-top: 5px; font-size: 11px; font-weight: 400; color: #68758a; }
 .admin-stock { color: #438268; font-size: 12px; }
 .admin-stock.low { color: #b37b29; }
 .admin-price-cell { color: #34435c !important; font-weight: 700; }
@@ -532,6 +538,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .admin-page-heading p:not(.admin-eyebrow) { font-size: 12px; line-height: 1.55; }
   .admin-primary-button { min-height: 43px; width: 100%; font-size: 13px; }
   .admin-stat-grid { gap: 8px; margin-bottom: 13px; }
+  .admin-stat-grid.admin-sales-summary { grid-template-columns: minmax(0,1fr); }
   .admin-stat-grid article { min-height: 91px; padding: 11px; }
   .admin-stat-grid article > span { font-size: 12px; }
   .admin-stat-grid article > strong { margin-top: 7px; font-size: 21px; }
@@ -590,7 +597,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .admin-sales-table td:nth-child(1)::before { content: 'ITEM SOLD'; margin-bottom: 2px; }
   .admin-sales-table td:nth-child(3)::before { content: 'SOLD VIA'; }
   .admin-sales-table td:nth-child(4)::before { content: 'QUANTITY'; }
-  .admin-sales-table td:nth-child(5)::before { content: 'FINAL PRICE'; }
+  .admin-sales-table td:nth-child(2)::before { content: 'STOCK SOURCE'; }
+  .admin-sales-table td:nth-child(5)::before { content: 'AMOUNT RECEIVED'; }
   .admin-sales-table td:nth-child(6)::before { content: 'SALE STATUS'; }
   .admin-inventory-table td:nth-child(6), .admin-sales-table td:nth-child(7) {
     grid-column: 1 / -1;
@@ -609,6 +617,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   .admin-modal { width: 100%; max-height: 92dvh; margin: 0; overflow-y: auto; border-radius: 18px 18px 0 0; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   .admin-modal > div:first-child { padding: 17px 18px; }
   .admin-modal > div:nth-child(2) { grid-template-columns: minmax(0,1fr); gap: 13px; padding: 16px 18px; }
+  .admin-modal > fieldset { grid-template-columns: minmax(0,1fr); gap: 13px; padding: 16px 18px; }
+  .admin-modal > fieldset .sm\:col-span-2 { grid-column: 1 / -1; }
   .admin-modal > div:last-child { padding: 13px 18px; }
 }
 

@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { onAuthStateChanged, sendEmailVerification, signInWithEmailAndPassword, signOut, User as FirebaseUser } from 'firebase/auth';
-import { Product, ProductVariant, SaleRecord } from '../types';
+import { OutsideSaleDraft, Product, ProductVariant, SaleRecord } from '../types';
 import { getFirebaseAuth } from '../lib/firebase';
 import { displayImageUrl } from '../lib/displayImageUrl';
+import { nigeriaDate, outsideSaleDocument, summarizeSales } from '../lib/sales';
 
 interface AdminProps {
   onAddProduct: (product: Omit<Product, 'id'>) => Promise<void>;
@@ -10,6 +11,7 @@ interface AdminProps {
   onDeleteProduct: (id: Product['id']) => Promise<void>;
   onRestoreProduct: (id: Product['id']) => Promise<void>;
   onMarkSold: (id: Product['id'], soldPrice: number, serialNumber: string | null, variantId?: string) => Promise<void>;
+  onRecordOutsideSale: (saleId: string, sale: OutsideSaleDraft) => Promise<void>;
   onReverseSale: (saleId: string, reason: string) => Promise<void>;
   onBack: () => void;
 }
@@ -31,6 +33,14 @@ type ProductForm = {
 };
 
 type InventoryFilter = 'all' | 'devices' | 'goodies' | 'low-stock' | 'deleted';
+type OutsideSaleForm = Omit<OutsideSaleDraft, 'quantity' | 'soldPrice' | 'costPrice'> & { quantity: string; soldPrice: string; costPrice: string };
+
+function emptyOutsideSale(): OutsideSaleForm {
+  return { productName: '', brand: '', condition: '', storage: '', serialNumber: '', quantity: '1', soldPrice: '', costPrice: '', sourcedFrom: '', notes: '', saleDate: nigeriaDate(), saleChannel: 'whatsapp' };
+}
+
+const naira = (amount: number) => `₦${amount.toLocaleString('en-NG', { maximumFractionDigits: 2 })}`;
+const saleChannelLabel = { whatsapp: 'WhatsApp', 'in-store': 'In store', other: 'Other' };
 
 const EMPTY_FORM: ProductForm = {
   name: '', brand: '', price: '', oldPrice: '', category: '', condition: '', conditionNotes: '', stock: '1', badge: '', images: [], imageUrlDraft: '', listingGroup: 'devices', variants: [],
@@ -38,7 +48,7 @@ const EMPTY_FORM: ProductForm = {
 const ADMIN_EMAIL = (import.meta.env.VITE_FIREBASE_ADMIN_EMAIL || '').trim().toLowerCase();
 const INPUT_CLASS = 'w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100';
 
-export default function Admin({ onAddProduct, onEditProduct, onDeleteProduct, onRestoreProduct, onMarkSold, onReverseSale, onBack }: AdminProps) {
+export default function Admin({ onAddProduct, onEditProduct, onDeleteProduct, onRestoreProduct, onMarkSold, onRecordOutsideSale, onReverseSale, onBack }: AdminProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [sales, setSales] = useState<SaleRecord[]>([]);
   const [inventoryLoading, setInventoryLoading] = useState(false);
@@ -68,6 +78,10 @@ export default function Admin({ onAddProduct, onEditProduct, onDeleteProduct, on
   const [saleHasNoIdentifier, setSaleHasNoIdentifier] = useState(false);
   const [saleError, setSaleError] = useState('');
   const [saleBusy, setSaleBusy] = useState(false);
+  const [outsideSaleId, setOutsideSaleId] = useState<string | null>(null);
+  const [outsideSale, setOutsideSale] = useState<OutsideSaleForm>(emptyOutsideSale);
+  const [outsideSaleBusy, setOutsideSaleBusy] = useState(false);
+  const [outsideSaleError, setOutsideSaleError] = useState('');
   const [reversingSale, setReversingSale] = useState<SaleRecord | null>(null);
   const [reversalReason, setReversalReason] = useState('');
   const [reversalError, setReversalError] = useState('');
@@ -345,6 +359,32 @@ export default function Admin({ onAddProduct, onEditProduct, onDeleteProduct, on
     }
   }
 
+  function openOutsideSale() {
+    setOutsideSaleId(crypto.randomUUID());
+    setOutsideSale(emptyOutsideSale());
+    setOutsideSaleError('');
+  }
+
+  async function saveOutsideSale(event: FormEvent) {
+    event.preventDefault();
+    if (!outsideSaleId || outsideSaleBusy) return;
+    setOutsideSaleBusy(true);
+    setOutsideSaleError('');
+    try {
+      if (!outsideSale.soldPrice.trim()) throw new Error('Enter the total amount received.');
+      const draft: OutsideSaleDraft = { ...outsideSale, quantity: Number(outsideSale.quantity), soldPrice: Number(outsideSale.soldPrice), costPrice: outsideSale.costPrice.trim() ? Number(outsideSale.costPrice) : null };
+      outsideSaleDocument(draft);
+      await onRecordOutsideSale(outsideSaleId, draft);
+      setOutsideSaleId(null);
+      setActiveSection('sales');
+      await refreshSales();
+    } catch (error) {
+      setOutsideSaleError(error instanceof Error ? error.message : 'Could not record this sale.');
+    } finally {
+      setOutsideSaleBusy(false);
+    }
+  }
+
   function openReverseSale(sale: SaleRecord) {
     setReversingSale(sale);
     setReversalReason('');
@@ -383,6 +423,9 @@ export default function Admin({ onAddProduct, onEditProduct, onDeleteProduct, on
   const goodiesCount = activeProducts.filter(product => product.listingGroup === 'goodies').length;
   const lowStockCount = activeProducts.filter(product => (product.stock ?? 0) <= 1).length;
   const deletedCount = products.filter(product => product.listingStatus === 'deleted').length;
+  const salesSummary = summarizeSales(sales);
+  const outsideSaleProfit = outsideSale.soldPrice.trim() && outsideSale.costPrice.trim() && Number.isFinite(Number(outsideSale.soldPrice)) && Number.isFinite(Number(outsideSale.costPrice))
+    ? Number(outsideSale.soldPrice) - Number(outsideSale.costPrice) : null;
   const visibleProducts = products.filter(product => {
     const deleted = product.listingStatus === 'deleted';
     if (inventoryFilter === 'deleted' ? !deleted : deleted || product.listingStatus === 'sold') return false;
@@ -447,14 +490,20 @@ export default function Admin({ onAddProduct, onEditProduct, onDeleteProduct, on
         <main className="admin-main">
           <header className="admin-topbar"><span>Store workspace <i>/</i> {activeSection === 'sales' ? 'Sales history' : inventoryFilter === 'all' ? 'Overview' : inventoryFilter === 'low-stock' ? 'Low stock' : inventoryFilter === 'goodies' ? 'Goodies' : inventoryFilter === 'deleted' ? 'Deleted' : 'Devices'}</span><div><span className="admin-secure-indicator">● Private admin</span><button onClick={() => void signOut(getFirebaseAuth())}>Sign out</button></div></header>
           <div className="admin-content">
-            <header className="admin-page-heading"><div><p className="admin-eyebrow">CODETECH GADGETS</p><h1>{activeSection === 'sales' ? 'Sales history' : inventoryFilter === 'all' ? 'Store overview' : inventoryFilter === 'low-stock' ? 'Low stock' : inventoryFilter === 'goodies' ? 'Goodies inventory' : inventoryFilter === 'deleted' ? 'Deleted listings' : 'Devices inventory'}</h1><p>{activeSection === 'sales' ? 'Every WhatsApp sale you record, kept for your business history.' : inventoryFilter === 'deleted' ? 'Restore a listing if it was deleted by mistake.' : 'Manage the listings customers see on your storefront.'}</p></div>{activeSection === 'inventory' && <button onClick={openAdd} className="admin-primary-button">＋ Add a device</button>}</header>
+            <header className="admin-page-heading"><div><p className="admin-eyebrow">CODETECH GADGETS</p><h1>{activeSection === 'sales' ? 'Sales history' : inventoryFilter === 'all' ? 'Store overview' : inventoryFilter === 'low-stock' ? 'Low stock' : inventoryFilter === 'goodies' ? 'Goodies inventory' : inventoryFilter === 'deleted' ? 'Deleted listings' : 'Devices inventory'}</h1><p>{activeSection === 'sales' ? 'Your inventory sales and items sourced from friends or suppliers, all in one history.' : inventoryFilter === 'deleted' ? 'Restore a listing if it was deleted by mistake.' : 'Manage the listings customers see on your storefront.'}</p></div><div className="admin-heading-actions"><button onClick={openOutsideSale} className="admin-primary-button">＋ Record outside sale</button>{activeSection === 'inventory' && <button onClick={openAdd} className="admin-refresh-button">＋ Add a device</button>}</div></header>
 
             {activeSection === 'inventory' && <section className="admin-stat-grid" aria-label="Inventory summary">
               <article><span>Active inventory</span><strong>{activeProducts.length}</strong><small>Not marked fully sold</small></article>
               <article><span>Devices</span><strong>{deviceCount}</strong><small>UK-used and brand-new</small></article>
               <article><span>Goodies</span><strong>{goodiesCount}</strong><small>Special price listings</small></article>
               <article className={lowStockCount ? 'attention' : ''}><span>Low stock</span><strong>{lowStockCount}</strong><small>One or fewer in stock</small></article>
-              <article><span>Recorded sales</span><strong>{sales.length}</strong><small>Sold through WhatsApp</small></article>
+              <article><span>Recorded sales</span><strong>{sales.length}</strong><small>Inventory and outside sales</small></article>
+            </section>}
+
+            {activeSection === 'sales' && <section className="admin-stat-grid admin-sales-summary" aria-label="Sales summary">
+              <article><span>Completed sales</span><strong>{salesSummary.completedCount}</strong><small>Reversed sales excluded</small></article>
+              <article><span>Total amount received</span><strong>{naira(salesSummary.revenue)}</strong><small>All completed sales</small></article>
+              <article><span>Gross profit with cost recorded</span><strong>{salesSummary.costedCount ? naira(salesSummary.grossProfit) : '—'}</strong><small>{salesSummary.costedCount} completed sale{salesSummary.costedCount === 1 ? '' : 's'} · before other expenses</small></article>
             </section>}
 
             {activeSection === 'inventory' ? <section className="admin-inventory-panel">
@@ -474,11 +523,18 @@ export default function Admin({ onAddProduct, onEditProduct, onDeleteProduct, on
                 </tbody></table></div>
               ) : <div className="admin-inventory-empty"><strong>{inventoryFilter === 'deleted' && !search.trim() ? 'No deleted listings' : products.length ? 'No matching products' : 'Your inventory is empty'}</strong><span>{inventoryFilter === 'deleted' && !search.trim() ? 'Listings you delete will appear here for restoration.' : products.length ? 'Try a different search or filter.' : 'Add your first device to publish it on the storefront.'}</span>{!products.length && inventoryFilter !== 'deleted' && <button onClick={openAdd}>Add a device</button>}</div>}
             </section> : <section className="admin-inventory-panel">
-              <div className="admin-inventory-heading"><div><h2>Recorded sales</h2><p>Sold inventory stays in Firestore and is listed here for reference.</p></div><button className="admin-refresh-button" onClick={() => void refreshSales()} disabled={salesLoading}>{salesLoading ? 'Refreshing…' : '↻ Refresh'}</button></div>
+              <div className="admin-inventory-heading"><div><h2>Recorded sales</h2><p>Keep track of every recorded sale, including items that were never listed.</p></div><button className="admin-refresh-button" onClick={() => void refreshSales()} disabled={salesLoading}>{salesLoading ? 'Refreshing…' : '↻ Refresh'}</button></div>
               {inventoryError && <p role="alert" className="admin-inventory-error">{inventoryError}</p>}
-              {salesLoading ? <p className="admin-inventory-empty">Loading sales…</p> : sales.length ? <div className="admin-table-wrap"><table className="admin-product-table admin-sales-table"><thead><tr><th>Item sold</th><th>Section</th><th>Sold via</th><th>Quantity</th><th>Final price</th><th>Sale status</th><th>Action</th></tr></thead><tbody>
-                {sales.map(sale => <tr key={sale.id}><td><div className="admin-product-cell">{sale.image ? <img src={sale.image} alt=""/> : <span className="admin-product-placeholder">CT</span>}<span><strong>{sale.productName}</strong><small>{sale.brand} · {sale.condition}</small><small>IMEI / serial: {sale.serialNumber || (sale.hasNoIdentifier ? 'No identifier' : 'Not recorded')}</small></span></div></td><td><span className={`admin-section-pill ${sale.listingGroup === 'goodies' ? 'goodies' : ''}`}>{sale.listingGroup === 'goodies' ? 'Goodies' : 'Devices'}</span></td><td><span className="admin-sale-channel">WhatsApp</span></td><td>{sale.quantity}</td><td className="admin-price-cell">₦{sale.soldPrice.toLocaleString('en-NG')}</td><td><span className={`admin-sale-status ${sale.reversedAt ? 'reversed' : ''}`}>{sale.reversedAt ? 'Reversed' : 'Completed'}</span>{sale.reversedAt && <small className="admin-reversal-reason">{new Date(sale.reversedAt).toLocaleString('en-NG', { dateStyle: 'medium', timeStyle: 'short' })}{sale.restocked ? ' · Restocked' : ' · Not restocked'}{sale.reversalReason ? ` · ${sale.reversalReason}` : ''}</small>}</td><td>{sale.reversedAt ? <span className="admin-action-done">Recorded</span> : <button className="admin-reverse-button" onClick={() => openReverseSale(sale)}>Reverse sale</button>}</td></tr>)}
-              </tbody></table></div> : <div className="admin-inventory-empty"><strong>No sales recorded yet</strong><span>When a device sells on WhatsApp, mark it as sold from your inventory to keep a record here.</span></div>}
+              {salesLoading ? <p className="admin-inventory-empty">Loading sales…</p> : sales.length ? <div className="admin-table-wrap"><table className="admin-product-table admin-sales-table"><thead><tr><th>Item sold</th><th>Stock source</th><th>Sold via</th><th>Quantity</th><th>Amount received</th><th>Sale status</th><th>Action</th></tr></thead><tbody>
+                {sales.map(sale => <tr key={sale.id}>
+                  <td><div className="admin-product-cell">{sale.image ? <img src={sale.image} alt=""/> : <span className="admin-product-placeholder">CT</span>}<span><strong>{sale.productName}</strong><small>{[sale.brand, sale.condition, sale.variantStorage].filter(Boolean).join(' · ')}</small><small>{sale.soldAt ? new Date(sale.soldAt).toLocaleDateString('en-NG', { timeZone: 'Africa/Lagos', dateStyle: 'medium' }) : 'Date not recorded'}</small><small>IMEI / serial: {sale.serialNumber || (sale.hasNoIdentifier ? 'No identifier' : 'Not recorded')}</small>{sale.sourcedFrom && <small className="admin-sale-note">Sourced from: {sale.sourcedFrom}</small>}{sale.notes && <small className="admin-sale-note">{sale.notes}</small>}</span></div></td>
+                  <td><span className={`admin-section-pill ${sale.saleSource === 'outside' ? 'outside' : sale.listingGroup === 'goodies' ? 'goodies' : ''}`}>{sale.saleSource === 'outside' ? 'Outside sale' : sale.listingGroup === 'goodies' ? 'Goodies' : 'Devices'}</span></td>
+                  <td><span className="admin-sale-channel">{saleChannelLabel[sale.saleChannel]}</span></td><td>{sale.quantity}</td>
+                  <td className="admin-price-cell">{naira(sale.soldPrice)}{sale.costPrice !== undefined && <><small className="admin-sale-money">Cost: {naira(sale.costPrice)}</small><small className="admin-sale-money">Gross profit: {naira(sale.soldPrice - sale.costPrice)}</small></>}</td>
+                  <td><span className={`admin-sale-status ${sale.reversedAt ? 'reversed' : ''}`}>{sale.reversedAt ? 'Reversed' : 'Completed'}</span>{sale.reversedAt && <small className="admin-reversal-reason">{new Date(sale.reversedAt).toLocaleString('en-NG', { timeZone: 'Africa/Lagos', dateStyle: 'medium', timeStyle: 'short' })}{sale.restocked ? ' · Restocked' : ' · No stock change'}{sale.reversalReason ? ` · ${sale.reversalReason}` : ''}</small>}</td>
+                  <td>{sale.reversedAt ? <span className="admin-action-done">Recorded</span> : <button className="admin-reverse-button" onClick={() => openReverseSale(sale)}>Reverse sale</button>}</td>
+                </tr>)}
+              </tbody></table></div> : <div className="admin-inventory-empty"><strong>No sales recorded yet</strong><span>Mark an inventory item as sold, or record a sale for an item sourced elsewhere.</span><button onClick={openOutsideSale}>Record outside sale</button></div>}
             </section>}
           </div>
         </main>
@@ -544,6 +600,32 @@ export default function Admin({ onAddProduct, onEditProduct, onDeleteProduct, on
         </div>
       )}
 
+      {outsideSaleId && (
+        <div className="admin-modal-backdrop fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !outsideSaleBusy) setOutsideSaleId(null); }}>
+          <form onSubmit={saveOutsideSale} role="dialog" aria-modal="true" aria-labelledby="outside-sale-title" className="admin-modal my-6 w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="border-b border-slate-100 px-6 py-5"><p className="text-xs font-bold uppercase tracking-[.15em] text-blue-700">OUTSIDE SALE</p><h2 id="outside-sale-title" className="mt-2 text-xl font-bold text-slate-900">Record an item sourced elsewhere</h2><p className="mt-1 text-sm text-slate-500">Keep a record of a sale for an item collected from a friend or supplier.</p></div>
+            <fieldset disabled={outsideSaleBusy} className="grid gap-4 px-6 py-5 sm:grid-cols-2">
+              <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Item name *<input autoFocus required className={`${INPUT_CLASS} mt-1.5`} value={outsideSale.productName} onChange={event => setOutsideSale({ ...outsideSale, productName: event.target.value })} placeholder="iPhone 16 Pro" /></label>
+              <label className="text-sm font-semibold text-slate-700">Brand<input className={`${INPUT_CLASS} mt-1.5`} value={outsideSale.brand} onChange={event => setOutsideSale({ ...outsideSale, brand: event.target.value })} placeholder="Apple" /></label>
+              <label className="text-sm font-semibold text-slate-700">Storage<input className={`${INPUT_CLASS} mt-1.5`} value={outsideSale.storage} onChange={event => setOutsideSale({ ...outsideSale, storage: event.target.value })} placeholder="256GB (optional)" /></label>
+              <label className="text-sm font-semibold text-slate-700">Condition<input className={`${INPUT_CLASS} mt-1.5`} value={outsideSale.condition} onChange={event => setOutsideSale({ ...outsideSale, condition: event.target.value })} placeholder="UK Used or Brand New" /></label>
+              <label className="text-sm font-semibold text-slate-700">Sourced from<input className={`${INPUT_CLASS} mt-1.5`} value={outsideSale.sourcedFrom} onChange={event => setOutsideSale({ ...outsideSale, sourcedFrom: event.target.value })} placeholder="Friend or supplier name (optional)" /></label>
+              <label className="text-sm font-semibold text-slate-700">Quantity sold *<input required type="number" min="1" step="1" className={`${INPUT_CLASS} mt-1.5`} value={outsideSale.quantity} onChange={event => setOutsideSale({ ...outsideSale, quantity: event.target.value })} /></label>
+              <label className="text-sm font-semibold text-slate-700">Sale date (Nigeria time) *<input required type="date" max={nigeriaDate()} className={`${INPUT_CLASS} mt-1.5`} value={outsideSale.saleDate} onChange={event => setOutsideSale({ ...outsideSale, saleDate: event.target.value })} /></label>
+              <label className="text-sm font-semibold text-slate-700">Total amount received (₦) *<input required type="number" min="0" step="0.01" className={`${INPUT_CLASS} mt-1.5`} value={outsideSale.soldPrice} onChange={event => setOutsideSale({ ...outsideSale, soldPrice: event.target.value })} placeholder="Your selling amount" /><small className="mt-1 block text-xs font-normal text-slate-500">Total for all units in this sale.</small></label>
+              <label className="text-sm font-semibold text-slate-700">Total sourcing cost (₦)<input type="number" min="0" step="0.01" className={`${INPUT_CLASS} mt-1.5`} value={outsideSale.costPrice} onChange={event => setOutsideSale({ ...outsideSale, costPrice: event.target.value })} placeholder="Optional" /><small className="mt-1 block text-xs font-normal text-slate-500">What you paid for all units. Leave blank if unknown.</small></label>
+              {outsideSaleProfit !== null && <p className={`rounded-xl p-3 text-sm font-semibold sm:col-span-2 ${outsideSaleProfit < 0 ? 'bg-red-50 text-red-900' : 'bg-green-50 text-green-900'}`}>Gross profit: {naira(outsideSaleProfit)}<small className="mt-1 block text-xs font-normal">Amount received minus sourcing cost, before other expenses.</small></p>}
+              <label className="text-sm font-semibold text-slate-700">Sold via<select className={`${INPUT_CLASS} mt-1.5`} value={outsideSale.saleChannel} onChange={event => setOutsideSale({ ...outsideSale, saleChannel: event.target.value as OutsideSaleDraft['saleChannel'] })}><option value="whatsapp">WhatsApp</option><option value="in-store">In store</option><option value="other">Other</option></select></label>
+              <label className="text-sm font-semibold text-slate-700">IMEI / serial numbers<input className={`${INPUT_CLASS} mt-1.5`} value={outsideSale.serialNumber} onChange={event => setOutsideSale({ ...outsideSale, serialNumber: event.target.value })} placeholder="Optional · separate multiple IDs with commas" autoComplete="off" /></label>
+              <label className="text-sm font-semibold text-slate-700 sm:col-span-2">Notes<textarea className={`${INPUT_CLASS} mt-1.5 min-h-20 resize-y`} value={outsideSale.notes} onChange={event => setOutsideSale({ ...outsideSale, notes: event.target.value })} placeholder="Any details you want to keep with the sale (optional)" /></label>
+              <p className="rounded-xl bg-blue-50 p-3 text-xs leading-5 text-blue-900 sm:col-span-2">This saves a private sales record. It won’t create a storefront listing or change your inventory.</p>
+              {outsideSaleError && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 sm:col-span-2">{outsideSaleError}</p>}
+            </fieldset>
+            <div className="flex justify-end gap-3 border-t border-slate-100 px-6 py-4"><button type="button" disabled={outsideSaleBusy} onClick={() => setOutsideSaleId(null)} className="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button><button disabled={outsideSaleBusy} className="rounded-xl bg-blue-800 px-5 py-2.5 text-sm font-bold text-white disabled:opacity-50">{outsideSaleBusy ? 'Saving sale…' : 'Save sale'}</button></div>
+          </form>
+        </div>
+      )}
+
       {saleProduct && (
         <div className="admin-modal-backdrop fixed inset-0 z-50 grid place-items-center overflow-y-auto bg-slate-950/50 p-4" onMouseDown={event => { if (event.target === event.currentTarget && !saleBusy) setSaleProduct(null); }}>
           <form onSubmit={recordSale} className="admin-modal my-6 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
@@ -577,7 +659,7 @@ export default function Admin({ onAddProduct, onEditProduct, onDeleteProduct, on
           <form onSubmit={recordSaleReversal} className="admin-modal my-6 w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="border-b border-slate-100 px-6 py-5"><p className="text-xs font-bold uppercase tracking-[.15em] text-amber-700">SALE CORRECTION</p><h2 className="mt-2 text-xl font-bold text-slate-900">Reverse this sale?</h2><p className="mt-1 text-sm text-slate-500">{reversingSale.productName} · ₦{reversingSale.soldPrice.toLocaleString('en-NG')}</p></div>
             <div className="space-y-4 px-6 py-5">
-              <p className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">The original sale will stay in your history. This adds a separate reversal record and restores one unit to available stock so it can be resold. Nothing is deleted.</p>
+              <p className="rounded-xl bg-amber-50 p-3 text-xs leading-5 text-amber-900">{reversingSale.saleSource === 'outside' ? 'The original sale stays in your history with a reversal record. It will be excluded from completed sales totals, and your inventory will stay as it is.' : 'The original sale stays in your history with a reversal record. One unit is returned to inventory so it can be resold.'}</p>
               <label className="block text-xs font-semibold text-slate-700">Reason for reversal
                 <textarea className={`${INPUT_CLASS} mt-1.5 min-h-20 resize-y`} value={reversalReason} onChange={event => setReversalReason(event.target.value)} placeholder="For example: customer cancelled before collection" required minLength={5}/>
               </label>

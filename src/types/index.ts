@@ -32,6 +32,23 @@ export interface Product {
   selectedVariantId?: string;
 }
 
+export type SaleChannel = 'whatsapp' | 'in-store' | 'other';
+
+export interface OutsideSaleDraft {
+  productName: string;
+  brand: string;
+  condition: string;
+  storage: string;
+  serialNumber: string;
+  quantity: number;
+  soldPrice: number;
+  costPrice: number | null;
+  sourcedFrom: string;
+  notes: string;
+  saleDate: string;
+  saleChannel: SaleChannel;
+}
+
 export interface SaleRecord {
   id: string;
   productId: string;
@@ -47,7 +64,11 @@ export interface SaleRecord {
   soldPrice: number;
   variantId?: string;
   variantStorage?: string;
-  saleChannel: 'whatsapp';
+  saleSource?: 'inventory' | 'outside';
+  costPrice?: number;
+  sourcedFrom?: string;
+  notes?: string;
+  saleChannel: SaleChannel;
   soldAt: string;
   reversedAt?: string;
   reversalReason?: string;

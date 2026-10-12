@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect, lazy, Suspense } from 'react';
-import { Page, Product, CartItem, User } from './types';
+import { Page, Product, CartItem, User, OutsideSaleDraft } from './types';
 import { INITIAL_PRODUCTS } from './data/products';
 import Navbar from './components/Navbar';
 import Storefront from './components/Storefront';
@@ -239,9 +239,15 @@ export default function App() {
 
   async function reverseSale(saleId: string, reason: string) {
     const { reverseInventorySale } = await import('./lib/firestoreInventory');
-    await reverseInventorySale(saleId, reason);
-    await refreshCatalog();
-    showToast('Sale reversed. One unit is back in stock and available for resale.');
+    const result = await reverseInventorySale(saleId, reason);
+    if (result.restocked) await refreshCatalog();
+    showToast(result.restocked ? 'Sale reversed. One unit returned to inventory.' : 'Outside sale reversed. Correction saved in sales history.');
+  }
+
+  async function recordOutsideSale(saleId: string, sale: OutsideSaleDraft) {
+    const { recordOutsideSale: saveSale } = await import('./lib/firestoreInventory');
+    await saveSale(saleId, sale);
+    showToast('Outside sale saved in sales history.');
   }
 
   const selectedProduct = page === 'product'
@@ -257,7 +263,7 @@ export default function App() {
   const cartCount = cart.reduce((s, x) => s + x.qty, 0);
 
   if (page === 'admin') {
-    return <div className="admin-app-root"><Suspense fallback={<div className="admin-loading">Opening CodeTech Admin…</div>}><Admin onAddProduct={addProduct} onEditProduct={editProduct} onDeleteProduct={deleteProduct} onRestoreProduct={restoreProduct} onMarkSold={markProductSold} onReverseSale={reverseSale} onBack={() => navigate('home')} /></Suspense><Toast message={toast.msg} visible={toast.visible} /></div>;
+    return <div className="admin-app-root"><Suspense fallback={<div className="admin-loading">Opening CodeTech Admin…</div>}><Admin onAddProduct={addProduct} onEditProduct={editProduct} onDeleteProduct={deleteProduct} onRestoreProduct={restoreProduct} onMarkSold={markProductSold} onRecordOutsideSale={recordOutsideSale} onReverseSale={reverseSale} onBack={() => navigate('home')} /></Suspense><Toast message={toast.msg} visible={toast.visible} /></div>;
   }
 
   return (

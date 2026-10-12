@@ -1,6 +1,7 @@
 import { collection, deleteField, doc, getDocs, orderBy, query, runTransaction, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { Product, SaleRecord } from '../types';
+import { OutsideSaleDraft, Product, SaleRecord } from '../types';
 import { getDatabase } from './firebase';
+import { outsideSaleDocument } from './sales';
 
 export type ProductDraft = Omit<Product, 'id'>;
 
@@ -104,6 +105,7 @@ export async function markInventoryProductSold(id: string, soldPrice: number, se
       updatedAt: serverTimestamp(),
     });
     transaction.set(saleRef, {
+      saleSource: 'inventory',
       productId: snapshot.id,
       productName: String(product.name ?? product.title ?? 'Product'),
       serialNumber: serialNumber?.trim() ?? '',
@@ -127,6 +129,24 @@ export async function markInventoryProductSold(id: string, soldPrice: number, se
   return saleRef.id;
 }
 
+export async function recordOutsideSale(saleId: string, sale: OutsideSaleDraft) {
+  const record = outsideSaleDocument(sale);
+  if (!saleId || saleId.includes('/')) throw new Error('This sale could not be identified. Reopen the form and try again.');
+  const database = getDatabase();
+  const saleRef = doc(database, 'sales', saleId);
+  await runTransaction(database, async transaction => {
+    const existing = await transaction.get(saleRef);
+    // Retrying a save with the same form ID must not record the sale twice.
+    if (existing.exists()) {
+      const saved = existing.data();
+      const sameSale = Object.entries(record).every(([key, value]) => value instanceof Date ? saved[key]?.toMillis?.() === value.getTime() : saved[key] === value);
+      if (!sameSale) throw new Error('This sale was already saved. Close the form and review it in Sales history before recording another sale.');
+      return;
+    }
+    transaction.set(saleRef, { ...record, createdAt: serverTimestamp() });
+  });
+}
+
 export async function reverseInventorySale(saleId: string, reason: string) {
   const cleanReason = reason.trim();
   if (cleanReason.length < 5) throw new Error('Add a short reason for reversing this sale.');
@@ -135,13 +155,17 @@ export async function reverseInventorySale(saleId: string, reason: string) {
   const saleRef = doc(database, 'sales', saleId);
   const reversalRef = doc(database, 'saleReversals', saleId);
 
-  await runTransaction(database, async transaction => {
+  return runTransaction(database, async transaction => {
     const saleSnapshot = await transaction.get(saleRef);
     const reversalSnapshot = await transaction.get(reversalRef);
     if (!saleSnapshot.exists()) throw new Error('This sale record could not be found.');
     if (reversalSnapshot.exists()) throw new Error('This sale has already been reversed.');
 
     const sale = saleSnapshot.data();
+    if (sale.saleSource === 'outside') {
+      transaction.set(reversalRef, { saleId, productId: '', reason: cleanReason, restocked: false, reversedAt: serverTimestamp(), createdAt: serverTimestamp() });
+      return { restocked: false };
+    }
     const productId = String(sale.productId ?? '');
     const productRef = productId ? doc(database, 'products', productId) : null;
     const productSnapshot = productRef ? await transaction.get(productRef) : null;
@@ -171,6 +195,7 @@ export async function reverseInventorySale(saleId: string, reason: string) {
       reversedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
     });
+    return { restocked: true };
   });
 }
 
@@ -201,7 +226,11 @@ export async function loadSalesHistory(): Promise<SaleRecord[]> {
       soldPrice: Number(record.soldPriceNgn ?? 0),
       variantId: record.variantId ? String(record.variantId) : undefined,
       variantStorage: record.variantStorage ? String(record.variantStorage) : undefined,
-      saleChannel: 'whatsapp',
+      saleSource: record.saleSource === 'outside' ? 'outside' : 'inventory',
+      costPrice: typeof record.costPriceNgn === 'number' && Number.isFinite(record.costPriceNgn) ? record.costPriceNgn : undefined,
+      sourcedFrom: record.sourcedFrom ? String(record.sourcedFrom) : undefined,
+      notes: record.notes ? String(record.notes) : undefined,
+      saleChannel: record.saleChannel === 'in-store' || record.saleChannel === 'other' ? record.saleChannel : 'whatsapp',
       soldAt: timestamp?.toDate?.().toISOString() ?? '',
       reversedAt: reversedTimestamp?.toDate?.().toISOString(),
       reversalReason: reversal ? String(reversal.reason ?? '') : undefined,
