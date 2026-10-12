@@ -24,6 +24,7 @@ async function requestPayment(body: unknown) {
 
 export default function PaystackCheckout({ cart, onPaid }: { cart: CartItem[]; onPaid: (items: PendingPayment['items']) => void }) {
   const [enabled, setEnabled] = useState(false);
+  const [checkingAvailability, setCheckingAvailability] = useState(true);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -38,7 +39,11 @@ export default function PaystackCheckout({ cart, onPaid }: { cart: CartItem[]; o
 
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/checkout').then(response => response.json()).then(result => { if (!cancelled) setEnabled(result.enabled === true); }).catch(() => {});
+    void fetch('/api/checkout', { signal: AbortSignal.timeout(10000) })
+      .then(response => response.ok ? response.json() : null)
+      .then(result => { if (!cancelled) setEnabled(result?.enabled === true); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setCheckingAvailability(false); });
     return () => { cancelled = true; };
   }, []);
   useEffect(() => {
@@ -89,7 +94,10 @@ export default function PaystackCheckout({ cart, onPaid }: { cart: CartItem[]; o
       {!busy && <button type="button" className="mt-3 text-xs text-slate-500 underline" onClick={() => { setPending(null); setReceipt(null); setError(''); try { sessionStorage.removeItem(storageKey); } catch { /* Storage may be disabled. */ } }}>Close payment details</button>}
     </div>}
     {error && <p role="alert" className="mb-3 rounded-xl bg-red-50 p-3 text-xs leading-5 text-red-800">{error}</p>}
-    {enabled && cart.length > 0 && !open && <button type="button" disabled={busy} onClick={() => setOpen(true)} className="w-full rounded-xl bg-green-800 py-3 text-sm font-bold text-white disabled:opacity-50">Pay online with Paystack</button>}
+    {cart.length > 0 && !open && <>
+      <button type="button" disabled={busy || !enabled || checkingAvailability} onClick={() => setOpen(true)} className="w-full rounded-xl bg-green-800 py-3 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50">{checkingAvailability ? 'Checking online payment…' : 'Pay online with Paystack'}</button>
+      {!checkingAvailability && !enabled && <p className="mt-2 text-center text-xs leading-5 text-slate-500" role="status">Online payment is currently unavailable. You can send your order request on WhatsApp.</p>}
+    </>}
     {enabled && cart.length > 0 && open && <form onSubmit={pay} className="space-y-3">
       <h4 className="text-sm font-bold text-blue-950">Payment and contact details</h4>
       <fieldset disabled={busy} className="space-y-3">
