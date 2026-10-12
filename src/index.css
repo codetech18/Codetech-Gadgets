@@ -296,6 +296,16 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 .admin-stat-grid.admin-sales-summary { grid-template-columns: repeat(3,minmax(0,1fr)); }
 .admin-sales-summary article > strong { font-size: clamp(16px, 2vw, 24px); overflow-wrap: anywhere; }
 .admin-inventory-panel { border: 1px solid #e6eaf0; background: #fff; }
+.admin-online-orders { display: grid; gap: 14px; padding: 18px; }
+.admin-online-order { border: 1px solid #e4e8ee; padding: 18px; color: #68758a; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.admin-online-order p { margin: 8px 0; }
+.admin-online-order strong { color: #263650; }
+.admin-order-title { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.admin-order-title small { display: block; color: #8490a3; font-size: 11px; }
+.admin-order-reference { font-size: 11px; }
+.admin-order-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 9px; margin-top: 12px; }
+.admin-order-actions a { text-decoration: none; }
+.admin-online-order .admin-order-attention { padding: 10px; background: #fff5e6; color: #936c2d; }
 .admin-inventory-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 19px 21px; }
 .admin-inventory-heading h2 { margin: 0; color: #263650; font: 700 14px Manrope,sans-serif; }
 .admin-inventory-heading p { margin: 5px 0 0; color: #929bab; font-size: 12px; }

@@ -32,7 +32,7 @@ export interface Product {
   selectedVariantId?: string;
 }
 
-export type SaleChannel = 'whatsapp' | 'in-store' | 'other';
+export type SaleChannel = 'whatsapp' | 'in-store' | 'other' | 'paystack';
 
 export interface OutsideSaleDraft {
   productName: string;
@@ -46,7 +46,7 @@ export interface OutsideSaleDraft {
   sourcedFrom: string;
   notes: string;
   saleDate: string;
-  saleChannel: SaleChannel;
+  saleChannel: Exclude<SaleChannel, 'paystack'>;
 }
 
 export interface SaleRecord {
@@ -68,6 +68,8 @@ export interface SaleRecord {
   costPrice?: number;
   sourcedFrom?: string;
   notes?: string;
+  paymentReference?: string;
+  stockDeducted?: boolean;
   saleChannel: SaleChannel;
   soldAt: string;
   reversedAt?: string;

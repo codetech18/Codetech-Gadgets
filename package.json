@@ -9,13 +9,17 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test:seo": "node --test tests/seo.test.mjs",
-    "test:sales": "node --test tests/sales.test.mjs"
+    "test:sales": "node --test tests/sales.test.mjs",
+    "test:payments": "node --test tests/payments.test.mjs"
   },
   "dependencies": {
     "firebase": "^12.19.0",
+    "firebase-admin": "^14.5.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
+  "engines": { "node": "22.x" },
+  "overrides": { "@firebase/firestore": { "@grpc/grpc-js": "^1.14.6" } },
   "devDependencies": {
     "@types/react": "^18.2.43",
     "@types/react-dom": "^18.2.17",

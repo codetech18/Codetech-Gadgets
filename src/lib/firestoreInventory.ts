@@ -162,6 +162,7 @@ export async function reverseInventorySale(saleId: string, reason: string) {
     if (reversalSnapshot.exists()) throw new Error('This sale has already been reversed.');
 
     const sale = saleSnapshot.data();
+    if (sale.saleChannel === 'paystack') throw new Error('Manage Paystack refunds in the Paystack dashboard. A sale reversal does not refund an online payment.');
     if (sale.saleSource === 'outside') {
       transaction.set(reversalRef, { saleId, productId: '', reason: cleanReason, restocked: false, reversedAt: serverTimestamp(), createdAt: serverTimestamp() });
       return { restocked: false };
@@ -230,7 +231,9 @@ export async function loadSalesHistory(): Promise<SaleRecord[]> {
       costPrice: typeof record.costPriceNgn === 'number' && Number.isFinite(record.costPriceNgn) ? record.costPriceNgn : undefined,
       sourcedFrom: record.sourcedFrom ? String(record.sourcedFrom) : undefined,
       notes: record.notes ? String(record.notes) : undefined,
-      saleChannel: record.saleChannel === 'in-store' || record.saleChannel === 'other' ? record.saleChannel : 'whatsapp',
+      paymentReference: record.paymentReference ? String(record.paymentReference) : undefined,
+      stockDeducted: typeof record.stockDeducted === 'boolean' ? record.stockDeducted : undefined,
+      saleChannel: record.saleChannel === 'in-store' || record.saleChannel === 'other' || record.saleChannel === 'paystack' ? record.saleChannel : 'whatsapp',
       soldAt: timestamp?.toDate?.().toISOString() ?? '',
       reversedAt: reversedTimestamp?.toDate?.().toISOString(),
       reversalReason: reversal ? String(reversal.reason ?? '') : undefined,

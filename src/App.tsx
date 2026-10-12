@@ -34,7 +34,10 @@ export default function App() {
   const catalogGeneration = useRef(0);
   const [lookupProduct, setLookupProduct] = useState<Product | null>(null);
   const [lookupStatus, setLookupStatus] = useState<'idle' | 'loading' | 'missing'>('idle');
-  const [cart, setCart] = useState<CartItem[]>([]);
+  const [cart, setCart] = useState<CartItem[]>(() => {
+    try { const saved = JSON.parse(localStorage.getItem('codetech-cart') || '[]'); return Array.isArray(saved) ? saved.filter(item => item && typeof item.cartId === 'string' && Number.isInteger(item.qty) && item.qty > 0 && Number.isFinite(item.price)).slice(0, 20) : []; }
+    catch { return []; }
+  });
   const [user, setUser] = useState<User | null>(null);
   const [toast, setToast] = useState({ msg: '', visible: false });
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -190,6 +193,12 @@ export default function App() {
     showToast('Cart cleared');
   }, []);
 
+  useEffect(() => { try { localStorage.setItem('codetech-cart', JSON.stringify(cart)); } catch { /* Checkout still works when local storage is unavailable. */ } }, [cart]);
+  const paymentConfirmed = useCallback((items: Array<{ cartId: string; quantity: number }>) => {
+    setCart(current => current.map(item => ({ ...item, qty: item.qty - (items.find(paid => paid.cartId === item.cartId)?.quantity || 0) })).filter(item => item.qty > 0));
+    void refreshCatalog();
+  }, [refreshCatalog]);
+
   function checkout(promoDiscount: number) {
     void promoDiscount;
     if (!cart.length) return;
@@ -298,6 +307,7 @@ export default function App() {
       {/* CART */}
       {page === 'cart' && (
         <Cart
+          onPaymentConfirmed={paymentConfirmed}
           cart={cart}
           onChangeQty={changeQty}
           onRemove={removeFromCart}

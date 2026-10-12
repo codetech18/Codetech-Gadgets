@@ -1,10 +1,15 @@
 {
+  "functions": {
+    "api/checkout.js": { "maxDuration": 60 },
+    "api/paystack-webhook.js": { "maxDuration": 60 },
+    "api/delivery.js": { "maxDuration": 60 }
+  },
   "rewrites": [
     { "source": "/sitemap.xml", "destination": "/api/sitemap" },
     { "source": "/product/:id", "destination": "/index.html" },
     { "source": "/:page(devices|goodies|sell|swap|cart|login|signup|profile|complaint|admin)", "destination": "/index.html" }
   ],
   "headers": [
-    { "source": "/:page(cart|login|signup|profile|complaint|admin)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }] }
+    { "source": "/:page(cart|login|signup|profile|complaint|admin)", "headers": [{ "key": "X-Robots-Tag", "value": "noindex, follow" }, { "key": "Referrer-Policy", "value": "no-referrer" }] }
   ]
 }

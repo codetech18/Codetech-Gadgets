@@ -1,4 +1,5 @@
 import { CartItem, Product } from '../types';
+import PaystackCheckout from './PaystackCheckout';
 
 interface CartProps {
   cart: CartItem[];
@@ -7,16 +8,17 @@ interface CartProps {
   onClear: () => void;
   onCheckout: (promoDiscount: number) => void;
   onShopNow: () => void;
+  onPaymentConfirmed: (items: Array<{ cartId: string; quantity: number }>) => void;
 }
 
-export default function Cart({ cart, onChangeQty, onRemove, onClear, onCheckout, onShopNow }: CartProps) {
+export default function Cart({ cart, onChangeQty, onRemove, onClear, onCheckout, onShopNow, onPaymentConfirmed }: CartProps) {
   const subtotal = cart.reduce((s, x) => s + x.price * x.qty, 0);
   const totalQty = cart.reduce((s, x) => s + x.qty, 0);
 
   return (
     <div className="min-h-screen bg-slate-50 pt-[80px] sm:pt-[90px]">
       <div className="max-w-[1100px] mx-auto px-[4%] sm:px-[5%] py-8 pb-16">
-        <h2 className="font-['Manrope'] font-extrabold text-2xl sm:text-[2rem] text-blue-950 mb-6">Your purchase request</h2>
+        <h2 className="font-['Manrope'] font-extrabold text-2xl sm:text-[2rem] text-blue-950 mb-6">Your bag</h2>
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5 items-start">
 
           {/* Items */}
@@ -58,10 +60,10 @@ export default function Cart({ cart, onChangeQty, onRemove, onClear, onCheckout,
 
           {/* Summary */}
           <div className="bg-white rounded-2xl border border-slate-200 p-5 shadow-[0_1px_3px_rgba(37,99,235,0.08)] lg:sticky lg:top-[90px]">
-            <h3 className="font-['Manrope'] font-extrabold text-blue-950 text-lg pb-4 border-b border-slate-100 mb-4">Request summary</h3>
+            <h3 className="font-['Manrope'] font-extrabold text-blue-950 text-lg pb-4 border-b border-slate-100 mb-4">Order summary</h3>
             <div className="space-y-3 text-sm mb-4">
               <div className="flex justify-between text-slate-500"><span>Subtotal</span><span className="font-semibold text-slate-700">₦{subtotal.toLocaleString()}</span></div>
-              <p className="text-xs leading-5 text-slate-500">We’ll confirm stock, delivery options, and payment with you on WhatsApp.</p>
+              <p className="text-xs leading-5 text-slate-500">Delivery fees are arranged separately. Contact us on WhatsApp to confirm delivery options or ask about your purchase.</p>
             </div>
             <div className="flex justify-between items-center font-['Manrope'] font-extrabold text-blue-950 pt-3 border-t border-slate-200 mb-5">
               <span className="text-base">Items total</span>
@@ -69,9 +71,10 @@ export default function Cart({ cart, onChangeQty, onRemove, onClear, onCheckout,
             </div>
             <button onClick={() => onCheckout(0)} disabled={cart.length === 0}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-all text-sm sm:text-base disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed enabled:hover:shadow-[0_4px_20px_rgba(37,99,235,0.3)] enabled:hover:-translate-y-0.5">
-              Send purchase request
+              Send request on WhatsApp
             </button>
             <p className="text-center text-xs text-slate-400 mt-3">This sends an enquiry. We’ll confirm availability, delivery and payment before your order is placed.</p>
+            <PaystackCheckout cart={cart} onPaid={onPaymentConfirmed} />
           </div>
         </div>
       </div>

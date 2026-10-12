@@ -142,3 +142,9 @@ test('summary combines completed sales, excludes reversals and treats unknown co
     { soldPrice: 800000, costPrice: 600000, reversedAt: '2026-10-02' },
   ]), { completedCount: 4, revenue: 2850000, costedCount: 3, grossProfit: 230000 });
 });
+
+test('ordinary sale reversals cannot pretend to refund a Paystack payment', async () => {
+  const db = database([['sales/online', { productId: 'phone', saleChannel: 'paystack' }]]);
+  await assert.rejects(reverseInventorySale('online', 'Refund customer'), /Paystack dashboard/);
+  assert.deepEqual(db.writes, []);
+});
